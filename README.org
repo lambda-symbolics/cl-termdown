@@ -1,0 +1,83 @@
+#+title: cl-termdown
+
+cl-termdown parses a restrained Markdown subset into terminal-oriented semantic
+spans. It preserves Unicode cell widths, whole-word wrapping, bullets and
+numbered lists, inline emphasis and code, bounded pipe tables, fenced syntax
+highlighting, and speculative streaming previews.
+
+Rows are lists of neutral cons spans whose =car= is a keyword role and whose
+=cdr= is text. The library emits no ANSI controls and imposes no color policy.
+
+* Usage
+
+#+BEGIN_SRC lisp
+(asdf:load-system :cl-termdown)
+
+(let ((renderer (termdown:markdown-renderer-create :width 48)))
+  (termdown:markdown-render-line
+   renderer
+   "- render **strong** and `code` spans"))
+;; => (((:PLAIN . "  ")
+;;      (:BRAND . "• ")
+;;      (:PLAIN . "render ")
+;;      (:STRONG . "strong")
+;;      (:PLAIN . " and ")
+;;      (:CODE . "code")
+;;      (:PLAIN . " spans")))
+#+END_SRC
+
+One renderer retains fenced-code and pipe-table state across logical lines.
+Renderer widths below 24 cells are raised to 24.
+
+=markdown-render-inline= parses and wraps inline spans without block state:
+
+#+BEGIN_SRC lisp
+(termdown:markdown-render-inline "**important** text" 20)
+#+END_SRC
+
+=markdown-render-partial= returns three values: no committed rows, all current
+speculative live rows, and the complete retained source string. The renderer is
+not mutated. Call =markdown-render-line= only when a newline commits that
+logical line.
+
+#+BEGIN_SRC lisp
+(multiple-value-bind (committed live retained)
+    (termdown:markdown-render-partial renderer "unfinished **strong")
+  (values committed live retained))
+#+END_SRC
+
+* Public API
+
+- =markdown-renderer=: stateful renderer class.
+- =markdown-renderer-create=: create a renderer with =:width=.
+- =markdown-renderer-width=: read its effective row width.
+- =markdown-render-line=: render and commit one logical line.
+- =markdown-render-inline=: render inline Markdown within an exact width.
+- =markdown-render-partial=: preview an uncommitted logical line as three values.
+- =make-span=, =span-p=, =span-role=, =span-text=: neutral =(role . text)= spans.
+- =spans-width=: total Unicode terminal-cell width of a span row.
+- =column-widths=: allocate cell-aware table column widths.
+
+Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
+=:code=, and the =:syntax-*= roles produced by Colordiff.
+
+* Tests
+
+#+BEGIN_SRC sh
+./script/bootstrap
+./script/check
+#+END_SRC
+
+=script/check= runs =CL-TERMDOWN/TESTS= in an isolated source registry and
+rejects a =CL-TERMDOWN= system resolved outside this checkout.
+
+* Dependencies
+
+cl-termdown uses Clinedi for Unicode geometry and wrapping, ColorLisp and
+Colordiff for fenced-code highlighting, and Serapeum for declarations. Qlot
+pins the exact tested dependency revisions.
+
+* License
+
+cl-termdown uses COLL-Attribution. The authoritative terms are in
+=LICENSE.lisp=.
