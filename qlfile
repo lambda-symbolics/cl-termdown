@@ -1,0 +1,9 @@
+ql babel 2026-01-01
+ql cffi 2026-01-01
+ql cl-ppcre 2026-01-01
+ql serapeum 2026-01-01
+
+git cl-colorist https://github.com/lambda-symbolics/cl-colorist.git :ref a4b65e63f40248c091d8ccf6023ad6fef5de7f0d
+git clinedi https://github.com/lambda-symbolics/clinedi.git :ref 17c6cbbeebd541529b21f0fb572099cf1509a106
+git colorlisp https://github.com/lambda-symbolics/colorlisp.git :ref 05a3313d52e2a2c643219a750dd5045df56c1cd7
+git colordiff https://github.com/lambda-symbolics/colordiff.git :ref 929457427d42dc0eebe847b49889c60c5259490f

@@ -1,0 +1,36 @@
+("quicklisp" .
+ (:class qlot/source/dist:source-dist
+  :initargs (:distribution "https://beta.quicklisp.org/dist/quicklisp.txt" :%version :latest)
+  :version "2026-01-01"))
+("babel" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version "2026-01-01")
+  :version "ql-2026-01-01"))
+("cffi" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version "2026-01-01")
+  :version "ql-2026-01-01"))
+("cl-ppcre" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version "2026-01-01")
+  :version "ql-2025-06-22"))
+("serapeum" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version "2026-01-01")
+  :version "ql-2026-01-01"))
+("cl-colorist" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/lambda-symbolics/cl-colorist.git" :ref "a4b65e63f40248c091d8ccf6023ad6fef5de7f0d")
+  :version "git-a4b65e63f40248c091d8ccf6023ad6fef5de7f0d"))
+("clinedi" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/lambda-symbolics/clinedi.git" :ref "17c6cbbeebd541529b21f0fb572099cf1509a106")
+  :version "git-17c6cbbeebd541529b21f0fb572099cf1509a106"))
+("colorlisp" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/lambda-symbolics/colorlisp.git" :ref "05a3313d52e2a2c643219a750dd5045df56c1cd7")
+  :version "git-05a3313d52e2a2c643219a750dd5045df56c1cd7"))
+("colordiff" .
+ (:class qlot/source/git:source-git
+  :initargs (:remote-url "https://github.com/lambda-symbolics/colordiff.git" :ref "929457427d42dc0eebe847b49889c60c5259490f")
+  :version "git-929457427d42dc0eebe847b49889c60c5259490f"))
