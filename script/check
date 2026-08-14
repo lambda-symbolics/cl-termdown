@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -eu
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd -- "$root"
+
+if [ ! -r "$root/.qlot/setup.lisp" ]; then
+  printf '%s\n' 'cl-termdown dependencies are missing; run ./script/bootstrap.' >&2
+  exit 1
+fi
+
+CL_SOURCE_REGISTRY="(:source-registry (:tree \"$root/\") :ignore-inherited-configuration)"
+export CL_SOURCE_REGISTRY
+
+exec sbcl --noinform --no-userinit --no-sysinit --non-interactive \
+  --load "$root/.qlot/setup.lisp" \
+  --eval '(require :asdf)' \
+  --eval '(asdf:load-asd (truename "cl-termdown.asd"))' \
+  --eval '(unless (equal (truename (asdf:system-source-file "cl-termdown")) (truename "cl-termdown.asd")) (error "Resolved cl-termdown outside this checkout: ~A" (asdf:system-source-file "cl-termdown")))' \
+  --eval '(asdf:test-system "cl-termdown")'
