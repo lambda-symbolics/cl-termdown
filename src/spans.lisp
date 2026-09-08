@@ -59,3 +59,42 @@
                          (- part-end position)))
                 result))
         (setf position span-end)))))
+
+
+(-> spans-text (list &key (:single-line-p boolean)) string)
+(defun spans-text (spans &key single-line-p)
+  "Return sanitized text from SPANS, optionally flattened onto one line."
+  (with-output-to-string (stream)
+    (dolist (span spans)
+      (write-string (sanitize-text (span-text span)
+                                   :single-line-p single-line-p)
+                    stream))))
+
+(-> fit-spans (list integer) list)
+(defun fit-spans (spans maximum-width)
+  "Return sanitized single-line SPANS clipped to MAXIMUM-WIDTH cells.
+
+Retain semantic roles and complete graphemes, including graphemes whose
+characters occur in adjacent spans."
+  (let* ((safe (mapcar (lambda (span)
+                         (make-span (span-role span)
+                                    (sanitize-text (span-text span)
+                                                   :single-line-p t)))
+                       spans))
+         (text (apply #'concatenate 'string (mapcar #'span-text safe)))
+         (visible (clinedi:text-cell-prefix text (max 0 maximum-width))))
+    (termdown--spans-subseq safe 0 (length visible))))
+
+(-> render-spans (list &key (:style-function (option function))) string)
+(defun render-spans (spans &key style-function)
+  "Return presentation for SPANS using an optional trusted STYLE-FUNCTION.
+
+STYLE-FUNCTION receives the semantic role and sanitized text of each span,
+and returns its trusted presentation. Without it, return plain visible text."
+  (with-output-to-string (stream)
+    (dolist (span spans)
+      (let ((text (sanitize-text (span-text span))))
+        (write-string (if style-function
+                          (funcall style-function (span-role span) text)
+                          text)
+                      stream)))))

@@ -13,6 +13,10 @@
                 #:->)
   (:export
    #:column-widths
+   #:fit-text
+   #:fit-spans
+   #:render-spans
+   #:spans-text
    #:make-span
    #:markdown-render-inline
    #:markdown-render-line

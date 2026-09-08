@@ -97,3 +97,18 @@ surplus space instead of leaving it unused."
                (widths (termdown--fit-minimums minimums cell-budget)))
           (termdown--grow-widths widths naturals cell-budget
                                  :fill-p fill-p)))))
+
+(-> fit-text
+    (string integer &key (:alignment (member :left :right)))
+    string)
+(defun fit-text (text width &key (alignment ':left))
+  "Clip TEXT to WIDTH terminal cells and pad it using ALIGNMENT.
+
+ALIGNMENT is either :LEFT or :RIGHT."
+  (let* ((width (max 0 width))
+         (visible (clinedi:text-cell-prefix text width))
+         (padding (make-string (max 0 (- width (text-cell-width visible)))
+                               :initial-element #\Space)))
+    (ecase alignment
+      (:left (concatenate 'string visible padding))
+      (:right (concatenate 'string padding visible)))))

@@ -337,10 +337,15 @@
                  "completed code lines number from the preserved counter"))
   nil)
 
+
+
 (-> run-tests () boolean)
 (defun run-tests ()
   "Run all cl-termdown tests and return true on success."
   (setf *test-count* 0)
+  (test-layout-column-widths)
+  (test-layout-fit-text)
+  (test-span-presentation)
   (test-markdown-inline-spans)
   (test-markdown-lists)
   (test-markdown-code-blocks)
@@ -348,3 +353,43 @@
   (test-markdown-partial-streaming)
   (format t "~&~D cl-termdown tests passed.~%" *test-count*)
   t)
+
+
+;;;; -- Cell-Aware Layout Tests --
+
+(-> test-layout-column-widths () null)
+(defun test-layout-column-widths ()
+  "Test bounded columns preserve small cells and share constrained space."
+  (test-assert (equal (termdown:column-widths
+                       '(("id" "description")
+                         ("longer-id" "a considerably longer description"))
+                       30
+                       :gap-width 2)
+                      '(9 19))
+               "column layout preserves the short label column before wrapping values")
+  (test-assert (= (reduce #'+
+                          (termdown:column-widths
+                           '(("first" "second"))
+                           24
+                           :gap-width 3
+                           :fill-p t))
+                  21)
+               "filled cell widths account for their inter-column gap")
+  (test-assert (equal (termdown:column-widths
+                       '(("a" "b" "c"))
+                       2
+                       :gap-width 1)
+                      '(0 0 0))
+               "impossibly narrow layouts never exceed their width")
+  nil)
+
+(-> test-layout-fit-text () null)
+(defun test-layout-fit-text ()
+  "Test cell-aware clipping, padding, and alignment."
+  (test-assert (string= (termdown:fit-text "ab" 4) "ab  ")
+               "left-aligned cells pad on the right")
+  (test-assert (string= (termdown:fit-text "ab" 4 :alignment ':right) "  ab")
+               "right-aligned cells pad on the left")
+  (test-assert (= (text-cell-width (termdown:fit-text "λ界x" 3)) 3)
+               "fitted Unicode text consumes its exact terminal-cell budget")
+  nil)

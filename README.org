@@ -46,6 +46,11 @@ Call =markdown-render-line= when a newline commits that logical line.
 - =make-span=, =span-p=, =span-role=, =span-text=: neutral =(role . text)= spans
 - =spans-width=: total Unicode terminal-cell width of a span row
 - =column-widths=: allocate cell-aware table column widths
+- =fit-text=: clip and align a single table cell
+- =spans-text=: concatenate sanitized visible text, optionally as one line
+- =fit-spans=: clip sanitized spans by cells without splitting graphemes
+- =render-spans=: render sanitized text with an optional trusted
+  =:style-function= accepting =(role text)= and returning presentation
 
 Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
 =:code=, and the =:syntax-*= roles produced by Colordiff.

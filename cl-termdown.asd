@@ -22,7 +22,8 @@
   :serial t
   :components ((:module "tests"
                 :serial t
-                :components ((:file "tests"))))
+                :components ((:file "tests")
+                             (:file "spans"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
              (uiop:symbol-call '#:termdown/tests '#:run-tests)))
