@@ -40,6 +40,9 @@ Call =markdown-render-line= when a newline commits that logical line.
 - =markdown-renderer=: stateful renderer class
 - =markdown-renderer-create=: create a renderer with =:width=
 - =markdown-renderer-width=: read its effective row width
+- =markdown-renderer-closed-code-source=: the raw text of the fence that just
+  closed, or =nil= once another fence opens; its closing row ends in a
+  =:code-copy= span that applications may turn into a copy control
 - =markdown-render-line=: render and commit one logical line
 - =markdown-render-inline=: render inline Markdown within an exact width
 - =markdown-render-partial=: preview an uncommitted logical line as three values
@@ -53,7 +56,7 @@ Call =markdown-render-line= when a newline commits that logical line.
   =:style-function= accepting =(role text)= and returning presentation
 
 Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
-=:code=, and the =:syntax-*= roles produced by Colordiff.
+=:code=, =:code-copy=, and the =:syntax-*= roles produced by Colordiff.
 
 * Tests
 

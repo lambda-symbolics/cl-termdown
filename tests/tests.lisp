@@ -9,6 +9,7 @@
                 #:markdown-render-inline
                 #:markdown-render-line
                 #:markdown-render-partial
+                #:markdown-renderer-closed-code-source
                 #:markdown-renderer-create
                 #:span-role
                 #:span-text
@@ -158,16 +159,24 @@
                            (first (markdown-render-line renderer "  42)")))
                           "    2 │   42)")
                  "code line numbers advance per logical line")
-    (test-assert (string= (markdown-tests--row-text
-                           (first (markdown-render-line renderer "```")))
-                          "  ```")
-                 "closing fences terminate the block")
+    (test-assert (null (markdown-renderer-closed-code-source renderer))
+                 "an open fence has no closed source yet")
+    (let ((closing (first (markdown-render-line renderer "```"))))
+      (test-assert (string= (markdown-tests--row-text closing) "  ``` ⧉ copy")
+                   "closing fences terminate the block with a copy affordance")
+      (test-assert (find ':code-copy closing :key #'span-role)
+                   "the copy affordance carries its own role"))
+    (test-assert (string= (markdown-renderer-closed-code-source renderer)
+                          (format nil "(defun foo ()~%  42)"))
+                 "closing a fence exposes its raw source")
     (test-assert (string= (markdown-tests--row-text
                            (first (markdown-render-line renderer
                                                         "*after* block")))
                           "  after block")
                  "inline parsing resumes after a code block")
     (markdown-render-line renderer "```")
+    (test-assert (null (markdown-renderer-closed-code-source renderer))
+                 "opening a new fence clears the previous closed source")
     (test-assert (string= (markdown-tests--row-text
                            (first (markdown-render-line renderer "(new)")))
                           "    1 │ (new)")
@@ -334,7 +343,17 @@
                            (first (markdown-render-line renderer
                                                         "fn committed() {}")))
                           "    1 │ fn committed() {}")
-                 "completed code lines number from the preserved counter"))
+                 "completed code lines number from the preserved counter")
+    (multiple-value-bind (rows tail-rows retained)
+        (markdown-render-partial renderer "```")
+      (declare (ignore rows retained))
+      (test-assert (and (find ':code-copy (first tail-rows) :key #'span-role)
+                        (null (markdown-renderer-closed-code-source renderer)))
+                   "a speculative closing fence never exposes source from the live renderer"))
+    (markdown-render-line renderer "```")
+    (test-assert (string= (markdown-renderer-closed-code-source renderer)
+                          "fn committed() {}")
+                 "the committed closing fence exposes exactly the committed lines"))
   nil)
 
 

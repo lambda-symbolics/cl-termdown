@@ -23,6 +23,17 @@
     :accessor markdown-renderer-code-language
     :type (or null language)
     :documentation "The resolved language of the open fenced code block.")
+   (code-source
+    :initform nil
+    :accessor markdown-renderer-code-source
+    :type list
+    :documentation "The open fenced code block's raw lines, newest first.")
+   (closed-code-source
+    :initform nil
+    :accessor markdown-renderer-closed-code-source
+    :type (or null string)
+    :documentation
+    "The raw source of the most recently closed fenced code block, until the next fence opens.")
    (table-column-count
     :initform nil
     :accessor markdown-renderer-table-column-count
@@ -57,6 +68,10 @@
           (markdown-renderer-code-line-number renderer)
           (markdown-renderer-code-language copy)
           (markdown-renderer-code-language renderer)
+          (markdown-renderer-code-source copy)
+          (copy-list (markdown-renderer-code-source renderer))
+          (markdown-renderer-closed-code-source copy)
+          (markdown-renderer-closed-code-source renderer)
           (markdown-renderer-table-column-count copy)
           (markdown-renderer-table-column-count renderer)
           (markdown-renderer-table-column-widths copy)
@@ -534,16 +549,24 @@ inline Markdown styling."
       ((and (markdown-renderer-code-open-p renderer) fence-p)
        (markdown--reset-table renderer)
        (setf (markdown-renderer-code-open-p renderer) nil
-             (markdown-renderer-code-language renderer) nil)
-       (list (list (make-span ':dim "  ```"))))
+             (markdown-renderer-code-language renderer) nil
+             (markdown-renderer-closed-code-source renderer)
+             (format nil "~{~A~^~%~}"
+                     (reverse (markdown-renderer-code-source renderer)))
+             (markdown-renderer-code-source renderer) nil)
+       (list (list (make-span ':dim "  ``` ")
+                   (make-span ':code-copy "⧉ copy"))))
       ((markdown-renderer-code-open-p renderer)
+       (push line (markdown-renderer-code-source renderer))
        (markdown--code-rows renderer line))
       (fence-p
        (markdown--reset-table renderer)
        (setf (markdown-renderer-code-open-p renderer) t
              (markdown-renderer-code-line-number renderer) 1
              (markdown-renderer-code-language renderer)
-             (markdown--fence-language language))
+             (markdown--fence-language language)
+             (markdown-renderer-code-source renderer) nil
+             (markdown-renderer-closed-code-source renderer) nil)
        (list (list (make-span ':dim (format nil "  ```~A" language)))))
       ((zerop (length (string-trim " " line)))
        (markdown--reset-table renderer)

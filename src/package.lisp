@@ -22,6 +22,7 @@
    #:markdown-render-line
    #:markdown-render-partial
    #:markdown-renderer
+   #:markdown-renderer-closed-code-source
    #:markdown-renderer-create
    #:markdown-renderer-width
    #:span
