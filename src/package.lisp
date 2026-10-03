@@ -18,6 +18,7 @@
    #:render-spans
    #:spans-text
    #:make-span
+   #:make-widget
    #:markdown-render-inline
    #:markdown-render-line
    #:markdown-render-partial
@@ -29,6 +30,15 @@
    #:span-p
    #:span-role
    #:span-text
-   #:spans-width))
+   #:spans-width
+   #:presentation-spans
+   #:region-action
+   #:shift-regions
+   #:widget
+   #:widget-action
+   #:widget-label
+   #:widget-p
+   #:widget-regions
+   #:widget-role))
 
 (in-package #:termdown)

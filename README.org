@@ -54,6 +54,14 @@ Call =markdown-render-line= when a newline commits that logical line.
 - =fit-spans=: clip sanitized spans by cells without splitting graphemes
 - =render-spans=: render sanitized text with an optional trusted
   =:style-function= accepting =(role text)= and returning presentation
+- =make-widget=, =widget-p=, =widget-role=, =widget-label=, =widget-action=:
+  a label shown like a span of its role that carries an application action;
+  every span function above presents it as its label
+- =presentation-spans=: replace widgets by the spans of their labels
+- =widget-regions=: the =(start end action)= character extents of the widgets
+  in a row, indexing =spans-text=, from an optional =:start= offset
+- =shift-regions=, =region-action=: move regions after their text is joined
+  to other text, and find the action covering a character offset
 
 Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
 =:code=, =:code-copy=, and the =:syntax-*= roles produced by Colordiff.

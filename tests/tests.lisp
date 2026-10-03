@@ -365,6 +365,7 @@
   (test-layout-column-widths)
   (test-layout-fit-text)
   (test-span-presentation)
+  (test-widget-regions)
   (test-markdown-inline-spans)
   (test-markdown-lists)
   (test-markdown-code-blocks)
