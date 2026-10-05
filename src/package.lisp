@@ -16,6 +16,7 @@
    #:fit-text
    #:fit-spans
    #:render-spans
+   #:selector-table-rows
    #:spans-text
    #:make-span
    #:make-widget

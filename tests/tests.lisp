@@ -371,6 +371,7 @@
   (test-markdown-code-blocks)
   (test-markdown-tables)
   (test-markdown-partial-streaming)
+  (test-selector-table-rows)
   (format t "~&~D cl-termdown tests passed.~%" *test-count*)
   t)
 

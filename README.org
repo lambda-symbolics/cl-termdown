@@ -62,6 +62,12 @@ Call =markdown-render-line= when a newline commits that logical line.
   in a row, indexing =spans-text=, from an optional =:start= offset
 - =shift-regions=, =region-action=: move regions after their text is joined
   to other text, and find the action covering a character offset
+- =selector-table-rows=: span rows for a vertical Clinedi selector's visible
+  window as a table, with a selection marker, a label column, further columns
+  from =:column-functions= returning strings or spans and aligned across the
+  visible rows, and a heading row wherever =:group-function= changes group;
+  columns empty in every visible row are left out, and the roles are keyword
+  arguments
 
 Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
 =:code=, =:code-copy=, and the =:syntax-*= roles produced by Colordiff.

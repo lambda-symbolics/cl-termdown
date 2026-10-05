@@ -13,6 +13,7 @@
                 :components ((:file "package")
                              (:file "spans")
                              (:file "layout")
+                             (:file "selector")
                              (:file "markdown"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-termdown/tests))))
 
@@ -23,7 +24,8 @@
   :components ((:module "tests"
                 :serial t
                 :components ((:file "tests")
-                             (:file "spans"))))
+                             (:file "spans")
+                             (:file "selector"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
              (uiop:symbol-call '#:termdown/tests '#:run-tests)))
