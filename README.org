@@ -46,6 +46,7 @@ Call =markdown-render-line= when a newline commits that logical line.
 - =markdown-render-line=: render and commit one logical line
 - =markdown-render-inline=: render inline Markdown within an exact width
 - =markdown-render-partial=: preview an uncommitted logical line as three values
+- =markdown-render-finish=: flush an unfinished buffered diagram as source at EOF
 - =make-span=, =span-p=, =span-role=, =span-text=: neutral =(role . text)= spans
 - =spans-width=: total Unicode terminal-cell width of a span row
 - =column-widths=: allocate cell-aware table column widths
@@ -83,11 +84,22 @@ Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
 
 * Dependencies
 
-cl-termdown uses Clinedi for Unicode geometry and wrapping, ColorLisp and
-Colordiff for fenced-code highlighting, and Serapeum for declarations. Qlot
-pins the exact tested dependency revisions.
+cl-termdown uses Clinedi for Unicode geometry and wrapping, Clermaid for terminal
+diagrams, ColorLisp and Colordiff for fenced-code highlighting, and Serapeum for
+declarations. Qlot pins the tested dependency revisions.
 
 * License
 
 cl-termdown uses COLL-Attribution. The authoritative terms are in
 =LICENSE.lisp=.
+
+* Mermaid fences
+
+Fenced blocks tagged =mermaid= render through Clermaid when they close.
+Read the original body from =markdown-renderer-closed-code-source= and use the
+closing row's =:code-copy= span to add a copy control. Unsupported, malformed,
+excessively large, or too-wide diagrams display numbered source instead.
+
+Open diagrams appear only in speculative previews. Call =markdown-render-finish=
+at the end of a document or interrupted stream to display incomplete source.
+See Clermaid's README for the supported syntax.

@@ -5,6 +5,7 @@
   :version "0.1.0"
   :serial t
   :depends-on (#:clinedi
+               #:clermaid
                #:colordiff
                #:colorlisp
                #:serapeum)
@@ -25,7 +26,8 @@
                 :serial t
                 :components ((:file "tests")
                              (:file "spans")
-                             (:file "selector"))))
+                             (:file "selector")
+                             (:file "mermaid"))))
   :perform (asdf:test-op (operation component)
              (declare (ignore operation component))
              (uiop:symbol-call '#:termdown/tests '#:run-tests)))

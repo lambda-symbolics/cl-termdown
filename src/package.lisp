@@ -4,6 +4,9 @@
                 #:sanitize-text
                 #:text-cell-width
                 #:wrap-text)
+  (:import-from #:clermaid
+                #:mermaid-error
+                #:render-mermaid)
   (:import-from #:colordiff
                 #:highlight-lines)
   (:import-from #:colorlisp
@@ -23,6 +26,7 @@
    #:markdown-render-inline
    #:markdown-render-line
    #:markdown-render-partial
+   #:markdown-render-finish
    #:markdown-renderer
    #:markdown-renderer-closed-code-source
    #:markdown-renderer-create

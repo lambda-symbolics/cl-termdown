@@ -8,6 +8,12 @@
     :reader markdown-renderer-width
     :type (integer 24)
     :documentation "The total cell budget for one rendered row including indents.")
+   (raw-fence-p
+    :initarg :raw-fence-p
+    :initform nil
+    :accessor markdown-renderer-raw-fence-p
+    :type boolean
+    :documentation "Whether Mermaid rendering is disabled for raw fence fallback.")
    (code-open-p
     :initform nil
     :accessor markdown-renderer-code-open-p
@@ -28,6 +34,21 @@
     :accessor markdown-renderer-code-source
     :type list
     :documentation "The open fenced code block's raw lines, newest first.")
+   (mermaid-buffer-p
+    :initform nil
+    :accessor markdown-renderer-mermaid-buffer-p
+    :type boolean
+    :documentation "Whether an open Mermaid fence is buffered speculatively.")
+   (mermaid-source-length
+    :initform 0
+    :accessor markdown-renderer-mermaid-source-length
+    :type (integer 0)
+    :documentation "Characters retained for the open Mermaid fence.")
+   (mermaid-source
+    :initform nil
+    :accessor markdown-renderer-mermaid-source
+    :type list
+    :documentation "Buffered Mermaid fence lines, newest first.")
    (closed-code-source
     :initform nil
     :accessor markdown-renderer-closed-code-source
@@ -52,16 +73,18 @@
   (:documentation
    "A line-oriented renderer turning a restrained markdown subset into styled rows."))
 
-(-> markdown-renderer-create (&key (:width integer)) markdown-renderer)
-(defun markdown-renderer-create (&key (width 80))
+(-> markdown-renderer-create (&key (:width integer) (:raw-fence-p boolean)) markdown-renderer)
+(defun markdown-renderer-create (&key (width 80) raw-fence-p)
   "Create a markdown renderer wrapping rendered rows within WIDTH cells."
-  (make-instance 'markdown-renderer :width (max 24 width)))
+  (make-instance 'markdown-renderer :width (max 24 width)
+                 :raw-fence-p raw-fence-p))
 
 (-> markdown--copy-renderer (markdown-renderer) markdown-renderer)
 (defun markdown--copy-renderer (renderer)
   "Return an independent copy of RENDERER for speculative presentation."
   (let ((copy (make-instance 'markdown-renderer
-                             :width (markdown-renderer-width renderer))))
+                             :width (markdown-renderer-width renderer)
+                             :raw-fence-p (markdown-renderer-raw-fence-p renderer))))
     (setf (markdown-renderer-code-open-p copy)
           (markdown-renderer-code-open-p renderer)
           (markdown-renderer-code-line-number copy)
@@ -70,6 +93,12 @@
           (markdown-renderer-code-language renderer)
           (markdown-renderer-code-source copy)
           (copy-list (markdown-renderer-code-source renderer))
+          (markdown-renderer-mermaid-buffer-p copy)
+          (markdown-renderer-mermaid-buffer-p renderer)
+          (markdown-renderer-mermaid-source-length copy)
+          (markdown-renderer-mermaid-source-length renderer)
+          (markdown-renderer-mermaid-source copy)
+          (copy-list (markdown-renderer-mermaid-source renderer))
           (markdown-renderer-closed-code-source copy)
           (markdown-renderer-closed-code-source renderer)
           (markdown-renderer-table-column-count copy)
@@ -519,7 +548,6 @@ inline Markdown styling."
       (incf (markdown-renderer-code-line-number renderer))
       (nreverse rows))))
 
-
 ;;;; -- Public Rendering Operations --
 
 (-> markdown-render-inline (string integer) list)
@@ -527,18 +555,60 @@ inline Markdown styling."
   "Return TEXT as wrapped rows with inline Markdown styles within WIDTH cells."
   (multiple-value-bind (rendered styles)
       (markdown--parse-inline (sanitize-text text))
-    (let ((rows nil)
-          (cursor 0))
+    (let ((rows nil) (cursor 0))
       (dolist (row-text (wrap-text rendered (max 1 width)) (nreverse rows))
-        (let ((start (if (zerop (length row-text))
-                         cursor
-                         (search row-text rendered :start2 cursor))))
-          (push (markdown--style-runs rendered
-                                      styles
-                                      :start start
-                                      :end (+ start (length row-text)))
-                rows)
+        (let ((start (if (zerop (length row-text)) cursor
+                        (search row-text rendered :start2 cursor))))
+          (push (markdown--style-runs rendered styles :start start
+                                      :end (+ start (length row-text))) rows)
           (setf cursor (+ start (length row-text))))))))
+
+(defun markdown--join-lines (lines)
+  (format nil "~{~A~^~%~}" (reverse lines)))
+
+(defun markdown--mermaid-p (language)
+  (and language (string-equal language "mermaid")))
+
+(defun markdown--mermaid-source (renderer)
+  (let ((lines (reverse (markdown-renderer-mermaid-source renderer))))
+    (format nil "~{~A~^~%~}" (rest lines))))
+
+(defun markdown--ordinary-fence-rows (renderer lines)
+  (let ((copy (markdown-renderer-create :width (markdown-renderer-width renderer)
+                                       :raw-fence-p t))
+        (rows nil))
+    (dolist (line lines (nreverse rows))
+      (setf rows (nconc (nreverse (markdown-render-line copy line)) rows)))))
+
+(defun markdown--clear-mermaid (renderer)
+  (setf (markdown-renderer-mermaid-buffer-p renderer) nil
+        (markdown-renderer-mermaid-source-length renderer) 0
+        (markdown-renderer-mermaid-source renderer) nil))
+
+(defun markdown--mermaid-rows (renderer source)
+  (let ((rows (render-mermaid source
+                             :width (max 1 (- (markdown-renderer-width renderer) 2)))))
+    (mapcar (lambda (row)
+              (list (make-span ':plain
+                               (sanitize-text (concatenate 'string "  " row)))))
+            rows)))
+
+(defun markdown--close-mermaid (renderer)
+  (let* ((body (markdown--mermaid-source renderer))
+         (source-lines (reverse (markdown-renderer-mermaid-source renderer)))
+         (rows (handler-case
+                   (markdown--mermaid-rows renderer body)
+                 (mermaid-error () nil))))
+    (setf (markdown-renderer-closed-code-source renderer) body
+          (markdown-renderer-code-open-p renderer) nil
+          (markdown-renderer-code-language renderer) nil
+          (markdown-renderer-code-source renderer) nil)
+    (markdown--clear-mermaid renderer)
+    (if rows
+        (append rows
+                (list (list (make-span ':dim "  ``` ")
+                            (make-span ':code-copy "⧉ copy"))))
+        (markdown--ordinary-fence-rows renderer (append source-lines (list "```"))))))
 
 (-> markdown-render-line (markdown-renderer string) list)
 (defun markdown-render-line (renderer line)
@@ -546,6 +616,12 @@ inline Markdown styling."
   (multiple-value-bind (fence-p language)
       (markdown--fence-line-p line)
     (cond
+      ((and (not (markdown-renderer-raw-fence-p renderer))
+            (markdown-renderer-code-open-p renderer)
+            fence-p
+            (markdown-renderer-mermaid-buffer-p renderer))
+       (markdown--reset-table renderer)
+       (markdown--close-mermaid renderer))
       ((and (markdown-renderer-code-open-p renderer) fence-p)
        (markdown--reset-table renderer)
        (setf (markdown-renderer-code-open-p renderer) nil
@@ -556,6 +632,30 @@ inline Markdown styling."
              (markdown-renderer-code-source renderer) nil)
        (list (list (make-span ':dim "  ``` ")
                    (make-span ':code-copy "⧉ copy"))))
+      ((and (not (markdown-renderer-raw-fence-p renderer))
+            (markdown-renderer-code-open-p renderer)
+            (markdown-renderer-mermaid-buffer-p renderer))
+       (let ((new-length (+ (markdown-renderer-mermaid-source-length renderer)
+                            (length line) 1)))
+         (if (> new-length 65536)
+             (let* ((source-lines (reverse (markdown-renderer-mermaid-source renderer)))
+                    (body-lines (rest source-lines))
+                    (rows (list (list (make-span ':dim (first source-lines))))))
+               (setf (markdown-renderer-mermaid-buffer-p renderer) nil
+                     (markdown-renderer-mermaid-source-length renderer) 0
+                     (markdown-renderer-mermaid-source renderer) nil
+                     (markdown-renderer-code-language renderer) nil
+                     (markdown-renderer-code-source renderer)
+                     (cons line (reverse body-lines))
+                     (markdown-renderer-code-line-number renderer) 1)
+               (dolist (body-line body-lines)
+                 (setf rows (nconc rows (markdown--code-rows renderer body-line))))
+               (nconc rows (markdown--code-rows renderer line)))
+             (progn
+               (push line (markdown-renderer-mermaid-source renderer))
+               (incf (markdown-renderer-mermaid-source-length renderer)
+                     (+ (length line) 1))
+               nil))))
       ((markdown-renderer-code-open-p renderer)
        (push line (markdown-renderer-code-source renderer))
        (markdown--code-rows renderer line))
@@ -567,7 +667,16 @@ inline Markdown styling."
              (markdown--fence-language language)
              (markdown-renderer-code-source renderer) nil
              (markdown-renderer-closed-code-source renderer) nil)
-       (list (list (make-span ':dim (format nil "  ```~A" language)))))
+       (if (and (not (markdown-renderer-raw-fence-p renderer))
+                (markdown--mermaid-p language)
+                (<= (+ 1 (length line)) 65536))
+           (progn
+             (setf (markdown-renderer-mermaid-buffer-p renderer) t
+                   (markdown-renderer-mermaid-source renderer) (list line)
+                   (markdown-renderer-mermaid-source-length renderer)
+                   (+ 1 (length line)))
+             nil)
+           (list (list (make-span ':dim (format nil "  ```~A" language))))))
       ((zerop (length (string-trim " " line)))
        (markdown--reset-table renderer)
        (list nil))
@@ -580,24 +689,37 @@ inline Markdown styling."
                (markdown--reset-table renderer)
                (multiple-value-bind (content first-prefix continuation-prefix)
                    (markdown--line-layout line)
-                 (markdown--wrapped-rows
-                  renderer
-                  content
-                  :first-prefix first-prefix
-                  :continuation-prefix continuation-prefix)))))))))
+                 (markdown--wrapped-rows renderer content
+                                          :first-prefix first-prefix
+                                          :continuation-prefix continuation-prefix)))))))))
 
-(-> markdown-render-partial
-    (markdown-renderer string)
-    (values list list string))
+
+(-> markdown-render-finish (markdown-renderer) list)
+(defun markdown-render-finish (renderer)
+  "Flush an open fence, returning raw fallback rows when it is incomplete.
+The operation resets only buffered Mermaid state and is idempotent."
+  (if (and (markdown-renderer-code-open-p renderer)
+           (markdown-renderer-mermaid-buffer-p renderer))
+      (let ((rows (markdown--ordinary-fence-rows
+                   renderer (reverse (markdown-renderer-mermaid-source renderer)))))
+        (setf (markdown-renderer-code-open-p renderer) nil
+              (markdown-renderer-code-language renderer) nil
+              (markdown-renderer-code-source renderer) nil
+              (markdown-renderer-closed-code-source renderer)
+              (markdown--mermaid-source renderer))
+        (markdown--clear-mermaid renderer)
+        rows)
+      nil))
+
+(-> markdown-render-partial (markdown-renderer string) (values list list string))
 (defun markdown-render-partial (renderer partial)
-  "Return no committed rows, PARTIAL's live rows, and all retained source.
-
-An unfinished logical line remains speculative even after it visually wraps.
-Later chunks may close inline delimiters and change every wrapped row, so all
-preview rows remain live until a newline makes the logical line immutable."
-  (let* ((preview-renderer (markdown--copy-renderer renderer))
-         (preview-rows (markdown-render-line preview-renderer partial)))
-    (values nil
-            (unless (equal preview-rows '(nil))
-              preview-rows)
-            partial)))
+  "Return no committed rows, speculative live rows, and retained PARTIAL."
+  (let ((preview-renderer (markdown--copy-renderer renderer)))
+    (if (and (markdown-renderer-code-open-p preview-renderer)
+             (markdown-renderer-mermaid-buffer-p preview-renderer))
+        (let* ((lines (reverse (markdown-renderer-mermaid-source preview-renderer)))
+               (all (append lines (unless (zerop (length partial)) (list partial))))
+               (preview (markdown--ordinary-fence-rows preview-renderer all)))
+          (values nil preview partial))
+        (let ((preview-rows (markdown-render-line preview-renderer partial)))
+          (values nil (unless (equal preview-rows '(nil)) preview-rows) partial)))))
