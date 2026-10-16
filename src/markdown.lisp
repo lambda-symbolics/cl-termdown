@@ -586,15 +586,13 @@ inline Markdown styling."
         (markdown-renderer-mermaid-source renderer) nil))
 
 (defun markdown--mermaid-rows (renderer source)
-  (let* ((semantic (find-symbol "RENDER-MERMAID-SPANS" "CLERMAID"))
-         (rows (if (and semantic (fboundp semantic))
-                   (funcall semantic source :width (max 1 (- (markdown-renderer-width renderer) 2)))
-                   (mapcar (lambda (row) (list (make-span :plain row)))
-                           (render-mermaid source :width (max 1 (- (markdown-renderer-width renderer) 2))))))
+  "Render Mermaid source through Clermaid's direct semantic-span API."
+  (let ((rows (render-mermaid-spans
+               source :width (max 1 (- (markdown-renderer-width renderer) 2)))))
     (mapcar (lambda (row)
               (cons (make-span :plain "  ")
                     (mapcar (lambda (span)
-                              (make-span (span-role span) (sanitize-text (span-text span))))
+                              (make-span (first span) (sanitize-text (rest span))))
                             row)))
             rows)))
 

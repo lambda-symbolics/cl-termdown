@@ -6,7 +6,7 @@
                 #:wrap-text)
   (:import-from #:clermaid
                 #:mermaid-error
-                #:render-mermaid)
+                #:render-mermaid-spans)
   (:import-from #:colordiff
                 #:highlight-lines)
   (:import-from #:colorlisp

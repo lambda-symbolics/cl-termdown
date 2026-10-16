@@ -28,8 +28,8 @@
   :version "git-17c6cbbeebd541529b21f0fb572099cf1509a106"))
 ("clermaid" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/lambda-symbolics/clermaid.git" :ref "e7bfe916094883e079597604bec8edc61b168c36")
-  :version "git-e7bfe916094883e079597604bec8edc61b168c36"))
+  :initargs (:remote-url "https://github.com/lambda-symbolics/clermaid.git" :ref "9e38610ef0a595f9542b2727e1f97f5974f73ce5")
+  :version "git-9e38610ef0a595f9542b2727e1f97f5974f73ce5"))
 ("colorlisp" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/lambda-symbolics/colorlisp.git" :ref "05a3313d52e2a2c643219a750dd5045df56c1cd7")
