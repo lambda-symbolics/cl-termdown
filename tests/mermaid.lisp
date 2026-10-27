@@ -1,18 +1,22 @@
 (in-package #:termdown/tests)
 
+(-> mermaid-test-text (list) string)
 (defun mermaid-test-text (rows)
   "Flatten rendered rows for semantic content assertions."
   (with-output-to-string (stream)
     (dolist (row rows) (write-string (markdown-tests--row-text row) stream))))
 
+(-> mermaid-test-notices (list) list)
 (defun mermaid-test-notices (rows)
   "Return diagnostic rows without source rows or copy controls."
   (remove-if-not (lambda (row) (find :notice row :key #'span-role)) rows))
 
+(-> mermaid-test-without-spaces (string) string)
 (defun mermaid-test-without-spaces (text)
   "Remove wrapping whitespace for condition-report comparisons."
   (remove-if (lambda (char) (find char '(#\Space #\Tab #\Newline #\Return))) text))
 
+(-> test-mermaid-failure (string integer symbol) list)
 (defun test-mermaid-failure (body width condition-type)
   "Check a closed fallback against Clermaid's actual typed failure report."
   (let* ((renderer  (markdown-renderer-create :width width))
@@ -53,6 +57,7 @@
                    "following ordinary fence has no diagnostic")
       (markdown-render-line renderer "```"))))
 
+(-> test-mermaid-subgraphs () null)
 (defun test-mermaid-subgraphs ()
   "Render grouped flowcharts through completed and streamed Markdown fences."
   (dolist (body (list
@@ -88,7 +93,9 @@
                      "grouped diagrams retain exact source for copying"))))
   nil)
 
+(-> test-markdown-mermaid () null)
 (defun test-markdown-mermaid ()
+  "Test Mermaid fence buffering, rendering, failure notices and sanitizing."
   (let ((renderer (markdown-renderer-create :width 50)))
     (test-assert (null (markdown-render-line renderer "```mermaid")) "mermaid opener is buffered")
     (test-assert (null (markdown-render-line renderer "flowchart LR")) "mermaid body is buffered")

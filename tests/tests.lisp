@@ -20,6 +20,7 @@
 (defvar *test-count* 0
   "The number of assertions executed by the current test run.")
 
+(-> test-assert (t string) null)
 (defun test-assert (condition description)
   "Count and require CONDITION, reporting DESCRIPTION on failure."
   (incf *test-count*)

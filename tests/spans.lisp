@@ -1,5 +1,6 @@
 (in-package #:termdown/tests)
 
+(-> test-span-presentation () boolean)
 (defun test-span-presentation ()
   "Test safe rendering, role preservation, grapheme clipping and cell limits."
   (let* ((accent (string (code-char #x301)))
@@ -38,6 +39,7 @@
                  "single-line presentation removes row breaks"))
   t)
 
+(-> test-widget-regions () boolean)
 (defun test-widget-regions ()
   "Test that widgets present as spans and their regions locate their actions."
   (let* ((copy    (termdown:make-widget ':code-copy "copy" '(:copy "source")))

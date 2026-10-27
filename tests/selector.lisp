@@ -2,6 +2,7 @@
 
 ;;;; -- Grouped Selector Table Tests --
 
+(-> selector-tests--rows (list integer &key (:selection integer) (:visible-count integer)) list)
 (defun selector-tests--rows (entries width &key (selection 0) (visible-count 10))
   "Return table rows for ENTRIES, plists of :name :group :tally and :description."
   (let ((selector (clinedi:make-selector :items entries :visible-count visible-count)))
@@ -17,10 +18,12 @@
      :gap-width        2
      :label-role       ':user)))
 
+(-> selector-tests--text (list) (or null string))
 (defun selector-tests--text (row)
   "Return ROW's visible text, or NIL for an empty separator row."
   (and row (termdown:spans-text row)))
 
+(-> test-selector-table-rows () null)
 (defun test-selector-table-rows ()
   "Test grouped headings, aligned columns, empty columns, roles and clipping."
   (let* ((entries (list (list :name "alpha" :group "Models" :tally "3" :description "first")
