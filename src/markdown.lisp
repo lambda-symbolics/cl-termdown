@@ -564,9 +564,6 @@ inline Markdown styling."
                                       :end                   (+ start (length row-text))) rows)
           (setf cursor (+ start (length row-text))))))))
 
-(defun markdown--join-lines (lines)
-  (format nil "~{~A~^~%~}" (reverse lines)))
-
 (defun markdown--mermaid-p (language)
   (and language (string-equal language "mermaid")))
 
