@@ -1,4 +1,5 @@
 (defpackage #:termdown/tests
+  (:documentation "Test the termdown package.")
   (:use #:cl)
   (:import-from #:clinedi
                 #:text-cell-width)

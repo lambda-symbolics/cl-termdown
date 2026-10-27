@@ -1,4 +1,5 @@
 (defpackage #:termdown
+  (:documentation "Render Markdown as semantic spans for terminals.")
   (:use #:cl)
   (:import-from #:clinedi
                 #:sanitize-text
