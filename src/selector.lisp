@@ -65,8 +65,9 @@ When GROUP-FUNCTION returns a group different from the previous row's, a
 HEADING-ROLE row naming it precedes the candidate, after an empty row unless it
 is the first group."
   (unless (eq (clinedi:selector-arrangement selector) ':vertical)
-    (error 'type-error :datum         (clinedi:selector-arrangement selector)
-                       :expected-type '(eql :vertical)))
+    (error 'selector-arrangement-error :selector      selector
+                                       :datum         (clinedi:selector-arrangement selector)
+                                       :expected-type '(eql :vertical)))
   (let* ((marker-width   (max (text-cell-width selected-marker) (text-cell-width marker)))
          (indexes        (mapcar #'first
                                  (clinedi:selector-arrange
@@ -131,3 +132,18 @@ is the first group."
                                                spans column-width role)))))
                     width)))
           do (setf previous-group group))))
+
+
+;;;; -- Conditions --
+
+(define-condition selector-arrangement-error (type-error)
+  ((selector
+    :initarg       :selector
+    :reader        selector-arrangement-error-selector
+    :documentation "The selector whose arrangement cannot be shown as a table."))
+  (:documentation
+   "Signalled when a selector table is requested for a selector that is not vertical.")
+  (:report
+   (lambda (condition stream)
+     (format stream "A selector table needs a ~S selector, but the selector is arranged as ~S."
+             ':vertical (type-error-datum condition)))))

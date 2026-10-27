@@ -19,6 +19,8 @@
    #:fit-text
    #:fit-spans
    #:render-spans
+   #:selector-arrangement-error
+   #:selector-arrangement-error-selector
    #:selector-table-rows
    #:spans-text
    #:make-span

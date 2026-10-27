@@ -68,7 +68,9 @@ Call =markdown-render-line= when a newline commits that logical line.
   from =:column-functions= returning strings or spans and aligned across the
   visible rows, and a heading row wherever =:group-function= changes group;
   columns empty in every visible row are left out, and the roles are keyword
-  arguments
+  arguments; a selector that is not vertical signals
+  =selector-arrangement-error=, a =type-error= whose
+  =selector-arrangement-error-selector= returns the selector
 
 Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
 =:code=, =:code-copy=, =:notice=, and the =:syntax-*= roles produced by Colordiff.

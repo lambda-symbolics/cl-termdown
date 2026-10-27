@@ -71,9 +71,11 @@
     (test-assert (equal (mapcar #'selector-tests--text rows)
                         (list "  item 3" "  item 4" "▸ item 5"))
                  "only the selector's visible window is rendered"))
-  (test-assert (handler-case
-                   (progn (termdown:selector-table-rows
-                           (clinedi:make-selector :items '("a") :arrangement ':grid) 20)
-                          nil)
-                 (type-error () t))
-               "a grid selector is rejected"))
+  (let ((selector (clinedi:make-selector :items '("a") :arrangement ':grid)))
+    (test-assert (handler-case
+                     (progn (termdown:selector-table-rows selector 20)
+                            nil)
+                   (termdown:selector-arrangement-error (condition)
+                     (eq (termdown:selector-arrangement-error-selector condition)
+                         selector)))
+                 "a grid selector is rejected")))
