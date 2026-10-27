@@ -4,71 +4,71 @@
 
 (defclass markdown-renderer ()
   ((width
-    :initarg :width
-    :reader markdown-renderer-width
-    :type (integer 24)
+    :initarg       :width
+    :reader        markdown-renderer-width
+    :type          (integer 24)
     :documentation "The total cell budget for one rendered row including indents.")
    (raw-fence-p
-    :initarg :raw-fence-p
-    :initform nil
-    :accessor markdown-renderer-raw-fence-p
-    :type boolean
+    :initarg       :raw-fence-p
+    :initform      nil
+    :accessor      markdown-renderer-raw-fence-p
+    :type          boolean
     :documentation "Whether Mermaid rendering is disabled for raw fence fallback.")
    (code-open-p
-    :initform nil
-    :accessor markdown-renderer-code-open-p
-    :type boolean
+    :initform      nil
+    :accessor      markdown-renderer-code-open-p
+    :type          boolean
     :documentation "Whether rendering is inside a fenced code block.")
    (code-line-number
-    :initform 1
-    :accessor markdown-renderer-code-line-number
-    :type (integer 1)
+    :initform      1
+    :accessor      markdown-renderer-code-line-number
+    :type          (integer 1)
     :documentation "The gutter number given to the next fenced code line.")
    (code-language
-    :initform nil
-    :accessor markdown-renderer-code-language
-    :type (or null language)
+    :initform      nil
+    :accessor      markdown-renderer-code-language
+    :type          (or null language)
     :documentation "The resolved language of the open fenced code block.")
    (code-source
-    :initform nil
-    :accessor markdown-renderer-code-source
-    :type list
+    :initform      nil
+    :accessor      markdown-renderer-code-source
+    :type          list
     :documentation "The open fenced code block's raw lines, newest first.")
    (mermaid-buffer-p
-    :initform nil
-    :accessor markdown-renderer-mermaid-buffer-p
-    :type boolean
+    :initform      nil
+    :accessor      markdown-renderer-mermaid-buffer-p
+    :type          boolean
     :documentation "Whether an open Mermaid fence is buffered speculatively.")
    (mermaid-source-length
-    :initform 0
-    :accessor markdown-renderer-mermaid-source-length
-    :type (integer 0)
+    :initform      0
+    :accessor      markdown-renderer-mermaid-source-length
+    :type          (integer 0)
     :documentation "Characters retained for the open Mermaid fence.")
    (mermaid-source
-    :initform nil
-    :accessor markdown-renderer-mermaid-source
-    :type list
+    :initform      nil
+    :accessor      markdown-renderer-mermaid-source
+    :type          list
     :documentation "Buffered Mermaid fence lines, newest first.")
    (closed-code-source
     :initform nil
     :accessor markdown-renderer-closed-code-source
-    :type (or null string)
+    :type     (or null string)
     :documentation
     "The raw source of the most recently closed fenced code block, until the next fence opens.")
    (table-column-count
-    :initform nil
-    :accessor markdown-renderer-table-column-count
-    :type (or null (integer 2))
+    :initform      nil
+    :accessor      markdown-renderer-table-column-count
+    :type          (or null (integer 2))
     :documentation "The column count of the pipe table currently being rendered.")
    (table-column-widths
-    :initform nil
-    :accessor markdown-renderer-table-column-widths
-    :type list
+    :initform      nil
+    :accessor      markdown-renderer-table-column-widths
+    :type          list
     :documentation "The fixed cell widths selected from the current table header.")
    (table-header-p
-    :initform nil
-    :accessor markdown-renderer-table-header-p
-    :type boolean
+    :initform      nil
+    :accessor      markdown-renderer-table-header-p
+    :type          boolean
     :documentation "Whether the most recent pipe row is a possible table header."))
   (:documentation
    "A line-oriented renderer turning a restrained markdown subset into styled rows."))
@@ -77,13 +77,13 @@
 (defun markdown-renderer-create (&key (width 80) raw-fence-p)
   "Create a markdown renderer wrapping rendered rows within WIDTH cells."
   (make-instance 'markdown-renderer :width (max 24 width)
-                 :raw-fence-p raw-fence-p))
+                 :raw-fence-p              raw-fence-p))
 
 (-> markdown--copy-renderer (markdown-renderer) markdown-renderer)
 (defun markdown--copy-renderer (renderer)
   "Return an independent copy of RENDERER for speculative presentation."
   (let ((copy (make-instance 'markdown-renderer
-                             :width (markdown-renderer-width renderer)
+                             :width       (markdown-renderer-width renderer)
                              :raw-fence-p (markdown-renderer-raw-fence-p renderer))))
     (setf (markdown-renderer-code-open-p copy)
           (markdown-renderer-code-open-p renderer)
@@ -136,14 +136,14 @@
 
 Recognizes `code`, **strong**, and *emphasis* spans whose delimiters pair
 within TEXT. Unpaired delimiters stay literal."
-  (let ((rendered (make-array (length text)
-                              :element-type 'character
-                              :adjustable t
-                              :fill-pointer 0))
-        (styles (make-array (length text) :adjustable t :fill-pointer 0))
-        (mode ':plain)
+  (let ((rendered         (make-array (length text)
+                                      :element-type 'character
+                                      :adjustable   t
+                                      :fill-pointer 0))
+        (styles           (make-array (length text) :adjustable t :fill-pointer 0))
+        (mode             ':plain)
         (code-return-mode ':plain)
-        (index 0))
+        (index            0))
     (labels ((emit ()
                "Copy the current source character with the active style."
                (vector-push-extend (char text index) rendered)
@@ -203,19 +203,19 @@ within TEXT. Unpaired delimiters stay literal."
     list)
 (defun markdown--style-runs (rendered styles &key (start 0) (end (length rendered)))
   "Return spans for RENDERED between START and END grouped by equal style."
-  (let ((spans nil)
+  (let ((spans     nil)
         (run-start start))
     (loop for position from start below end
           when (and (> position run-start)
                     (not (eq (aref styles position)
                              (aref styles (1- position)))))
             do (push (make-span (aref styles (1- position))
-                                    (subseq rendered run-start position))
+                                (subseq rendered run-start position))
                      spans)
                (setf run-start position))
     (when (< run-start end)
       (push (make-span (aref styles (1- end))
-                           (subseq rendered run-start end))
+                       (subseq rendered run-start end))
             spans))
     (nreverse spans)))
 
@@ -262,7 +262,7 @@ within TEXT. Unpaired delimiters stay literal."
 (defun markdown--numbered-content (line)
   "Return LINE's numbered item content, leading indent, and marker text."
   (block nil
-    (let* ((lead (markdown--leading-spaces line))
+    (let* ((lead       (markdown--leading-spaces line))
            (digits-end (loop for position from lead below (length line)
                              while (digit-char-p (char line position))
                              finally (return position))))
@@ -292,7 +292,7 @@ within TEXT. Unpaired delimiters stay literal."
                    (list (make-span ':plain
                                         (concatenate 'string lead "  "))))))
         (numbered-content
-         (let ((lead (make-string (+ 2 numbered-lead) :initial-element #\Space))
+         (let ((lead   (make-string (+ 2 numbered-lead) :initial-element #\Space))
                (marker (concatenate 'string numbered-marker " ")))
            (values numbered-content
                    (list (make-span ':plain lead)
@@ -333,14 +333,14 @@ within TEXT. Unpaired delimiters stay literal."
 Two or more hyphens are accepted because model-generated tables commonly use
 that compact form even though stricter Markdown dialects require three."
   (let* ((trimmed (string-trim '(#\Space #\Tab) cell))
-         (start (if (and (plusp (length trimmed))
-                         (char= (char trimmed 0) #\:))
-                    1
-                    0))
-         (end (if (and (< start (length trimmed))
-                       (char= (char trimmed (1- (length trimmed))) #\:))
-                  (1- (length trimmed))
-                  (length trimmed))))
+         (start   (if (and (plusp (length trimmed))
+                           (char= (char trimmed 0) #\:))
+                      1
+                      0))
+         (end     (if (and (< start (length trimmed))
+                           (char= (char trimmed (1- (length trimmed))) #\:))
+                      (1- (length trimmed))
+                      (length trimmed))))
     (and (>= (- end start) 2)
          (loop for index from start below end
                always (char= (char trimmed index) #\-)))))
@@ -361,7 +361,7 @@ that compact form even though stricter Markdown dialects require three."
              :gap-width 3
              :minimum-widths
              (make-list (length cells) :initial-element 3)
-             :fill-p t))))
+             :fill-p    t))))
 
 (-> markdown--table-cell-rows (string integer boolean) list)
 (defun markdown--table-cell-rows (cell width header-p)
@@ -371,7 +371,7 @@ HEADER-P makes all visible header text strong. Body cells retain ordinary
 inline Markdown styling."
   (multiple-value-bind (rendered styles)
       (markdown--parse-inline cell)
-    (let ((rows nil)
+    (let ((rows   nil)
           (cursor 0))
       (dolist (row-text (wrap-text rendered width))
         (let ((start (if (zerop (length row-text))
@@ -383,7 +383,7 @@ inline Markdown styling."
                     (markdown--style-runs rendered
                                           styles
                                           :start start
-                                          :end (+ start (length row-text))))
+                                          :end   (+ start (length row-text))))
                 rows)
           (setf cursor (+ start (length row-text)))))
       (or (nreverse rows) (list nil)))))
@@ -391,11 +391,11 @@ inline Markdown styling."
 (-> markdown--table-rows (markdown-renderer list boolean) list)
 (defun markdown--table-rows (renderer cells header-p)
   "Render CELLS as a bounded table row, styling it as a header when HEADER-P."
-  (let* ((widths (markdown--table-column-widths renderer cells))
+  (let* ((widths  (markdown--table-column-widths renderer cells))
          (columns (loop for cell in cells
                         for width in widths
                         collect (markdown--table-cell-rows cell width header-p)))
-         (height (loop for column in columns maximize (length column))))
+         (height  (loop for column in columns maximize (length column))))
     (loop for row-index below height
           collect
           (loop with row = (list (make-span ':plain "  "))
@@ -447,7 +447,7 @@ inline Markdown styling."
     (block nil
       (unless cells
         (return (values nil nil)))
-      (let ((column-count (length cells))
+      (let ((column-count  (length cells))
             (tracked-count (markdown-renderer-table-column-count renderer)))
         (cond
           ((markdown--table-separator-p cells)
@@ -488,12 +488,12 @@ inline Markdown styling."
   "Return CONTENT as wrapped, prefixed, styled transcript rows."
   (multiple-value-bind (rendered styles)
       (markdown--parse-inline content)
-    (let* ((prefix-width (max (spans-width first-prefix)
-                              (spans-width continuation-prefix)))
+    (let* ((prefix-width  (max (spans-width first-prefix)
+                               (spans-width continuation-prefix)))
            (content-width (max 8 (- (markdown-renderer-width renderer)
                                     prefix-width)))
-           (rows nil)
-           (cursor 0))
+           (rows          nil)
+           (cursor        0))
       (loop for row-text in (wrap-text rendered content-width)
             for first-row-p = t then nil
             do (let ((start (if (zerop (length row-text))
@@ -505,8 +505,8 @@ inline Markdown styling."
                                (markdown--style-runs rendered
                                                      styles
                                                      :start start
-                                                     :end (+ start
-                                                             (length row-text))))
+                                                     :end   (+ start
+                                                               (length row-text))))
                        rows)
                  (setf cursor (+ start (length row-text)))))
       (nreverse rows))))
@@ -519,7 +519,7 @@ inline Markdown styling."
     (let* ((highlighted
              (highlight-lines
               line
-              :language (markdown-renderer-code-language renderer)
+              :language      (markdown-renderer-code-language renderer)
               :span-function #'make-span))
            (line-spans
              (or (and highlighted
@@ -528,8 +528,8 @@ inline Markdown styling."
                  (and (plusp (length line))
                       (list (make-span ':plain line)))))
            (content-width (max 8 (- (markdown-renderer-width renderer) 8)))
-           (rows nil)
-           (cursor 0))
+           (rows          nil)
+           (cursor        0))
       (loop for row-text in (wrap-text line content-width)
             for first-row-p = t then nil
             do (let ((start (if (zerop (length row-text))
@@ -548,6 +548,7 @@ inline Markdown styling."
       (incf (markdown-renderer-code-line-number renderer))
       (nreverse rows))))
 
+
 ;;;; -- Public Rendering Operations --
 
 (-> markdown-render-inline (string integer) list)
@@ -560,7 +561,7 @@ inline Markdown styling."
         (let ((start (if (zerop (length row-text)) cursor
                         (search row-text rendered :start2 cursor))))
           (push (markdown--style-runs rendered styles :start start
-                                      :end (+ start (length row-text))) rows)
+                                      :end                   (+ start (length row-text))) rows)
           (setf cursor (+ start (length row-text))))))))
 
 (defun markdown--join-lines (lines)
@@ -574,7 +575,7 @@ inline Markdown styling."
     (format nil "~{~A~^~%~}" (rest lines))))
 
 (defun markdown--ordinary-fence-rows (renderer lines)
-  (let ((copy (markdown-renderer-create :width (markdown-renderer-width renderer)
+  (let ((copy (markdown-renderer-create :width      (markdown-renderer-width renderer)
                                        :raw-fence-p t))
         (rows nil))
     (dolist (line lines (nreverse rows))
@@ -614,22 +615,27 @@ inline Markdown styling."
    renderer
    (format nil "~A: ~A"
            (typecase condition
-             (clermaid:unsupported-syntax "unsupported syntax")
-             (clermaid:invalid-diagram "invalid diagram")
-             (clermaid:diagram-too-wide "terminal width")
-             (clermaid:resource-limit-exceeded "resource limit")
-             (t "rendering error"))
+             (clermaid:unsupported-syntax
+              "unsupported syntax")
+             (clermaid:invalid-diagram
+              "invalid diagram")
+             (clermaid:diagram-too-wide
+              "terminal width")
+             (clermaid:resource-limit-exceeded
+              "resource limit")
+             (t
+              "rendering error"))
            condition)))
 
 (defun markdown--close-mermaid (renderer)
-  (let* ((body (markdown--mermaid-source renderer))
+  (let* ((body         (markdown--mermaid-source renderer))
          (source-lines (reverse (markdown-renderer-mermaid-source renderer)))
-         (notice nil)
-         (rows (handler-case
-                   (markdown--mermaid-rows renderer body)
-                 (mermaid-error (condition)
-                   (setf notice (markdown--mermaid-error-notice renderer condition))
-                   nil))))
+         (notice       nil)
+         (rows         (handler-case
+                           (markdown--mermaid-rows renderer body)
+                         (mermaid-error (condition)
+                           (setf notice (markdown--mermaid-error-notice renderer condition))
+                           nil))))
     (setf (markdown-renderer-closed-code-source renderer) body
           (markdown-renderer-code-open-p renderer) nil
           (markdown-renderer-code-language renderer) nil
@@ -671,11 +677,11 @@ inline Markdown styling."
                             (length line) 1)))
          (if (> new-length 65536)
              (let* ((source-lines (reverse (markdown-renderer-mermaid-source renderer)))
-                    (body-lines (rest source-lines))
-                    (rows (append
-                           (markdown--mermaid-notice
-                            renderer "source limit exceeded (65536 characters).")
-                           (list (list (make-span ':dim (first source-lines)))))))
+                    (body-lines   (rest source-lines))
+                    (rows         (append
+                                   (markdown--mermaid-notice
+                                    renderer "source limit exceeded (65536 characters).")
+                                   (list (list (make-span ':dim (first source-lines)))))))
                (setf (markdown-renderer-mermaid-buffer-p renderer) nil
                      (markdown-renderer-mermaid-source-length renderer) 0
                      (markdown-renderer-mermaid-source renderer) nil
@@ -730,9 +736,8 @@ inline Markdown styling."
                (multiple-value-bind (content first-prefix continuation-prefix)
                    (markdown--line-layout line)
                  (markdown--wrapped-rows renderer content
-                                          :first-prefix first-prefix
+                                          :first-prefix        first-prefix
                                           :continuation-prefix continuation-prefix)))))))))
-
 
 (-> markdown-render-finish (markdown-renderer) list)
 (defun markdown-render-finish (renderer)
@@ -754,12 +759,12 @@ The operation resets only buffered Mermaid state and is idempotent."
 (-> markdown-render-partial (markdown-renderer string) (values list list string))
 (defun markdown-render-partial (renderer partial)
   "Return no committed rows, speculative live rows, and retained PARTIAL."
-  (let ((preview-renderer (markdown--copy-renderer renderer))
+  (let ((preview-renderer     (markdown--copy-renderer renderer))
         (*markdown-preview-p* t))
     (if (and (markdown-renderer-code-open-p preview-renderer)
              (markdown-renderer-mermaid-buffer-p preview-renderer))
-        (let* ((lines (reverse (markdown-renderer-mermaid-source preview-renderer)))
-               (all (append lines (unless (zerop (length partial)) (list partial))))
+        (let* ((lines   (reverse (markdown-renderer-mermaid-source preview-renderer)))
+               (all     (append lines (unless (zerop (length partial)) (list partial))))
                (preview (markdown--ordinary-fence-rows preview-renderer all)))
           (values nil preview partial))
         (let ((preview-rows (markdown-render-line preview-renderer partial)))

@@ -15,7 +15,7 @@
 
 (defun test-mermaid-failure (body width condition-type)
   "Check a closed fallback against Clermaid's actual typed failure report."
-  (let* ((renderer (markdown-renderer-create :width width))
+  (let* ((renderer  (markdown-renderer-create :width width))
          (condition (handler-case
                         (clermaid:render-mermaid-spans body :width (- width 2))
                       (clermaid:mermaid-error (condition) condition))))
@@ -23,7 +23,7 @@
     (markdown-render-line renderer "```mermaid")
     (dolist (line (uiop:split-string body :separator '(#\Newline)))
       (test-assert (null (markdown-render-line renderer line)) "failed diagram buffers source"))
-    (let* ((rows (markdown-render-line renderer "```"))
+    (let* ((rows    (markdown-render-line renderer "```"))
            (notices (mermaid-test-notices rows)))
       (test-assert notices "closed failure has a visible diagnostic")
       (test-assert (search (mermaid-test-without-spaces
@@ -138,12 +138,12 @@
       (test-assert (search "plain code" (mermaid-test-text rows)) "normal code unaffected"))
     (markdown-render-line renderer "```")
     (test-assert (not (termdown::markdown-renderer-code-open-p renderer)) "normal code closes"))
-  (let* ((renderer (markdown-renderer-create :width 80))
+  (let* ((renderer   (markdown-renderer-create :width 80))
          (first-line (make-string 65500 :initial-element #\a))
-         (last-line (make-string 100 :initial-element #\b)))
+         (last-line  (make-string 100 :initial-element #\b)))
     (markdown-render-line renderer "```mermaid")
     (test-assert (null (markdown-render-line renderer first-line)) "buffer accepts a body below its cap")
-    (let* ((rows (markdown-render-line renderer last-line))
+    (let* ((rows    (markdown-render-line renderer last-line))
            (notices (mermaid-test-notices rows)))
       (test-assert notices "overflow has a visible diagnostic")
       (test-assert (every (lambda (row) (<= (spans-width row) 80)) notices)
@@ -160,7 +160,7 @@
     (test-assert (search "after" (mermaid-test-text (markdown-render-line renderer "after")))
                  "ordinary Markdown follows an overflowed fence"))
   (let* ((renderer (markdown-renderer-create :width 40))
-         (opener (concatenate 'string "```mermaid" (make-string 65536 :initial-element #\Space))))
+         (opener   (concatenate 'string "```mermaid" (make-string 65536 :initial-element #\Space))))
     (multiple-value-bind (committed preview retained) (markdown-render-partial renderer opener)
       (declare (ignore committed retained))
       (test-assert (null (mermaid-test-notices preview)) "speculative oversized opener has no failure notice"))
@@ -174,11 +174,11 @@
   (test-mermaid-failure (format nil "flowchart TD~%A[") 40 'clermaid:invalid-diagram)
   (test-mermaid-failure (format nil "flowchart LR~%A[abcdefghijklmnopqrstuvwxyz]-->B")
                         24 'clermaid:diagram-too-wide)
-  (let* ((renderer (markdown-renderer-create :width 24))
-         (reason (format nil "bad~C[31m~C~C~A" #\Escape #\Return #\Tab
-                         (make-string 40 :initial-element #\界)))
+  (let* ((renderer  (markdown-renderer-create :width 24))
+         (reason    (format nil "bad~C[31m~C~C~A" #\Escape #\Return #\Tab
+                            (make-string 40 :initial-element #\界)))
          (condition (make-condition 'clermaid:invalid-diagram :reason reason))
-         (rows (termdown::markdown--mermaid-error-notice renderer condition)))
+         (rows      (termdown::markdown--mermaid-error-notice renderer condition)))
     (test-assert (> (length rows) 2) "long diagnostic wraps")
     (test-assert (every (lambda (row) (<= (spans-width row) 24)) rows)
                  "wide Unicode diagnostic fits terminal cells")

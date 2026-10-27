@@ -35,6 +35,7 @@
   "Return SPAN's text."
   (rest span))
 
+
 ;;;; -- Widgets --
 
 (defstruct (widget
@@ -68,7 +69,7 @@ Offsets count characters of the text SPANS-TEXT presents for ITEMS, plus
 START, so regions of separately presented rows can be joined after their
 text is. Widgets with empty labels have no region."
   (let ((position start)
-        (regions nil))
+        (regions  nil))
     (dolist (item items (nreverse regions))
       (let ((length (length (sanitize-text (if (widget-p item)
                                                (widget-label item)
@@ -108,12 +109,12 @@ text is. Widgets with empty labels have no region."
 (defun termdown--spans-subseq (spans start end)
   "Return the character range from START to END within styled SPANS."
   (let ((position 0)
-        (result nil))
+        (result   nil))
     (dolist (span spans (nreverse result))
-      (let* ((text (span-text span))
-             (span-end (+ position (length text)))
+      (let* ((text       (span-text span))
+             (span-end   (+ position (length text)))
              (part-start (max start position))
-             (part-end (min end span-end)))
+             (part-end   (min end span-end)))
         (when (< part-start part-end)
           (push (make-span
                  (span-role span)
@@ -122,7 +123,6 @@ text is. Widgets with empty labels have no region."
                          (- part-end position)))
                 result))
         (setf position span-end)))))
-
 
 (-> spans-text (list &key (:single-line-p boolean)) string)
 (defun spans-text (spans &key single-line-p)
@@ -139,12 +139,12 @@ text is. Widgets with empty labels have no region."
 
 Retain semantic roles and complete graphemes, including graphemes whose
 characters occur in adjacent spans. Widgets become the spans of their labels."
-  (let* ((safe (mapcar (lambda (span)
-                         (make-span (span-role span)
-                                    (sanitize-text (span-text span)
-                                                   :single-line-p t)))
-                       (presentation-spans spans)))
-         (text (apply #'concatenate 'string (mapcar #'span-text safe)))
+  (let* ((safe    (mapcar (lambda (span)
+                            (make-span (span-role span)
+                                       (sanitize-text (span-text span)
+                                                      :single-line-p t)))
+                          (presentation-spans spans)))
+         (text    (apply #'concatenate 'string (mapcar #'span-text safe)))
          (visible (clinedi:text-cell-prefix text (max 0 maximum-width))))
     (termdown--spans-subseq safe 0 (length visible))))
 

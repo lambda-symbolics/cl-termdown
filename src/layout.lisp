@@ -34,7 +34,7 @@
 (-> termdown--fit-minimums (list integer) list)
 (defun termdown--fit-minimums (minimum-widths budget)
   "Fit MINIMUM-WIDTHS into BUDGET, preserving one cell per column when possible."
-  (let ((widths (make-list (length minimum-widths) :initial-element 0))
+  (let ((widths    (make-list (length minimum-widths) :initial-element 0))
         (remaining budget))
     (loop while (plusp remaining)
           for changed-p = nil
@@ -90,11 +90,11 @@ surplus space instead of leaving it unused."
   (let ((column-count (termdown--column-count rows)))
     (if (zerop column-count)
         nil
-        (let* ((gap-budget (* (max 0 gap-width) (1- column-count)))
+        (let* ((gap-budget  (* (max 0 gap-width) (1- column-count)))
                (cell-budget (max 0 (- (max 0 total-width) gap-budget)))
-               (minimums (termdown--minimum-widths column-count minimum-widths))
-               (naturals (termdown--natural-widths rows column-count minimums))
-               (widths (termdown--fit-minimums minimums cell-budget)))
+               (minimums    (termdown--minimum-widths column-count minimum-widths))
+               (naturals    (termdown--natural-widths rows column-count minimums))
+               (widths      (termdown--fit-minimums minimums cell-budget)))
           (termdown--grow-widths widths naturals cell-budget
                                  :fill-p fill-p)))))
 
@@ -105,10 +105,12 @@ surplus space instead of leaving it unused."
   "Clip TEXT to WIDTH terminal cells and pad it using ALIGNMENT.
 
 ALIGNMENT is either :LEFT or :RIGHT."
-  (let* ((width (max 0 width))
+  (let* ((width   (max 0 width))
          (visible (clinedi:text-cell-prefix text width))
          (padding (make-string (max 0 (- width (text-cell-width visible)))
                                :initial-element #\Space)))
     (ecase alignment
-      (:left (concatenate 'string visible padding))
-      (:right (concatenate 'string padding visible)))))
+      (:left
+       (concatenate 'string visible padding))
+      (:right
+       (concatenate 'string padding visible)))))

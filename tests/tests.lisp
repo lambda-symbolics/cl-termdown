@@ -51,9 +51,9 @@
 (defun test-markdown-inline-spans ()
   "Test emphasis, strong, and code span parsing with literal fallbacks."
   (let* ((renderer (markdown-renderer-create :width 60))
-         (row (first (markdown-render-line
-                      renderer
-                      "plain **bold** *soft* `code` end"))))
+         (row      (first (markdown-render-line
+                           renderer
+                           "plain **bold** *soft* `code` end"))))
     (test-assert (find (make-span :strong "bold") row :test #'equal)
                  "paired double asterisks render a strong span")
     (test-assert (find (make-span :emphasis "soft") row :test #'equal)
@@ -62,9 +62,9 @@
                  "paired backticks render an inline code span")
     (test-assert (not (find #\* (markdown-tests--row-text row)))
                  "paired inline markers are consumed"))
-  (let* ((rows (markdown-render-inline
-                "**<thought>** compare the available paths"
-                16))
+  (let* ((rows  (markdown-render-inline
+                 "**<thought>** compare the available paths"
+                 16))
          (spans (apply #'append rows)))
     (test-assert (find (make-span :strong "<thought>")
                        spans
@@ -76,9 +76,9 @@
                              rows))
                  "inline-only rendering wraps within its exact width"))
   (let* ((renderer (markdown-renderer-create :width 60))
-         (row (first (markdown-render-line
-                      renderer
-                      "3. **Bump to `0.10.1`**"))))
+         (row      (first (markdown-render-line
+                           renderer
+                           "3. **Bump to `0.10.1`**"))))
     (test-assert
      (string= (markdown-tests--row-text row) "  3. Bump to 0.10.1")
      "inline code inside strong text consumes both outer delimiters")
@@ -87,9 +87,9 @@
     (test-assert (find (make-span :code "0.10.1") row :test #'equal)
                  "nested inline code keeps its code style"))
   (let* ((renderer (markdown-renderer-create :width 60))
-         (row (first (markdown-render-line
-                      renderer
-                      "*inspect `src/startup/main.lisp` now*"))))
+         (row      (first (markdown-render-line
+                           renderer
+                           "*inspect `src/startup/main.lisp` now*"))))
     (test-assert
      (string= (markdown-tests--row-text row) "  inspect src/startup/main.lisp now")
      "inline code inside emphasis consumes both outer delimiters")
@@ -108,7 +108,7 @@
                          (format nil "  ~A" line))
                 description))))
   (let* ((renderer (markdown-renderer-create :width 60))
-         (row (first (markdown-render-line renderer "`keep *stars*` out"))))
+         (row      (first (markdown-render-line renderer "`keep *stars*` out"))))
     (test-assert (find (make-span :code "keep *stars*") row :test #'equal)
                  "inline code protects markers inside it"))
   nil)
@@ -117,9 +117,9 @@
 (defun test-markdown-lists ()
   "Test bullet and numbered items with hanging continuation indents."
   (let* ((renderer (markdown-renderer-create :width 30))
-         (rows (markdown-render-line
-                renderer
-                "- item one that is long enough to wrap")))
+         (rows     (markdown-render-line
+                    renderer
+                    "- item one that is long enough to wrap")))
     (test-assert (= (length rows) 2)
                  "long list items wrap into multiple rows")
     (test-assert (uiop:string-prefix-p "  • item one"
@@ -131,12 +131,12 @@
     (test-assert (find (make-span :brand "• ") (first rows) :test #'equal)
                  "bullet markers carry the brand style"))
   (let* ((renderer (markdown-renderer-create :width 40))
-         (rows (markdown-render-line renderer "12. twelfth item")))
+         (rows     (markdown-render-line renderer "12. twelfth item")))
     (test-assert (string= (markdown-tests--row-text (first rows))
                           "  12. twelfth item")
                  "numbered items keep their original marker"))
   (let* ((renderer (markdown-renderer-create :width 40))
-         (rows (markdown-render-line renderer "  - nested item")))
+         (rows     (markdown-render-line renderer "  - nested item")))
     (test-assert (string= (markdown-tests--row-text (first rows))
                           "    • nested item")
                  "nested bullets keep their extra indent"))
@@ -296,7 +296,7 @@
                    "every speculative wrapped row retains inline styling")
       (test-assert (string= retained "**bold text that goes on and on**")
                    "retained source preserves paired delimiters")))
-  (let* ((renderer (markdown-renderer-create :width 24))
+  (let* ((renderer       (markdown-renderer-create :width 24))
          (first-fragment "123456789012345678901*X"))
     (multiple-value-bind (rows tail retained)
         (markdown-render-partial renderer first-fragment)
@@ -356,8 +356,6 @@
                  "the committed closing fence exposes exactly the committed lines"))
   nil)
 
-
-
 (-> run-tests () boolean)
 (defun run-tests ()
   "Run all cl-termdown tests and return true on success."
@@ -394,7 +392,7 @@
                            '(("first" "second"))
                            24
                            :gap-width 3
-                           :fill-p t))
+                           :fill-p    t))
                   21)
                "filled cell widths account for their inter-column gap")
   (test-assert (equal (termdown:column-widths

@@ -3,8 +3,8 @@
 (defun test-span-presentation ()
   "Test safe rendering, role preservation, grapheme clipping and cell limits."
   (let* ((accent (string (code-char #x301)))
-         (spans (list (make-span ':plain "e") (make-span ':strong accent)
-                      (make-span ':code "界z"))))
+         (spans  (list (make-span ':plain "e") (make-span ':strong accent)
+                       (make-span ':code "界z"))))
     (loop for width from -1 to 5
           for expected in (list "" "" (concatenate 'string "e" accent)
                                 (concatenate 'string "e" accent)
@@ -18,8 +18,8 @@
                               (max 0 width))
                           "fitting obeys the cell budget")))
   (let* ((unsafe (format nil "a~C[31mb~%c" #\Escape))
-         (spans (list (make-span ':strong unsafe)))
-         (seen nil)
+         (spans  (list (make-span ':strong unsafe)))
+         (seen   nil)
          (rendered
            (termdown:render-spans
             spans :style-function
@@ -40,12 +40,12 @@
 
 (defun test-widget-regions ()
   "Test that widgets present as spans and their regions locate their actions."
-  (let* ((copy (termdown:make-widget ':code-copy "copy" '(:copy "source")))
-         (items (list (termdown:make-span ':plain (format nil "a~Cb " #\Tab))
-                      copy
-                      (termdown:make-widget ':dim "" '(:never))
-                      (termdown:make-span ':plain " z")))
-         (text (termdown:spans-text items))
+  (let* ((copy    (termdown:make-widget ':code-copy "copy" '(:copy "source")))
+         (items   (list (termdown:make-span ':plain (format nil "a~Cb " #\Tab))
+                        copy
+                        (termdown:make-widget ':dim "" '(:never))
+                        (termdown:make-span ':plain " z")))
+         (text    (termdown:spans-text items))
          (regions (termdown:widget-regions items)))
     (test-assert (string= text "a    b copy z")
                  "widgets present as their labels among sanitized spans")

@@ -8,14 +8,14 @@
     (clinedi:selector-move selector selection)
     (termdown:selector-table-rows
      selector width
-     :label-function (lambda (entry) (getf entry :name))
-     :group-function (lambda (entry) (getf entry :group))
+     :label-function   (lambda (entry) (getf entry :name))
+     :group-function   (lambda (entry) (getf entry :group))
      :column-functions (list (lambda (entry) (or (getf entry :tally) ""))
                              (lambda (entry) (or (getf entry :description-spans)
                                                  (getf entry :description)
                                                  "")))
-     :gap-width 2
-     :label-role ':user)))
+     :gap-width        2
+     :label-role       ':user)))
 
 (defun selector-tests--text (row)
   "Return ROW's visible text, or NIL for an empty separator row."
@@ -29,7 +29,7 @@
                               :description-spans (list (make-span ':code "code")
                                                        (make-span ':plain " text")))
                         (list :name "delta" :description "ungrouped")))
-         (rows (selector-tests--rows entries 60 :selection 1)))
+         (rows    (selector-tests--rows entries 60 :selection 1)))
     (test-assert (equal (mapcar #'selector-tests--text rows)
                         (list "  Models"
                               "  alpha       3   first"
@@ -39,9 +39,9 @@
                               "  gamma-long  12  code text"
                               "  delta           ungrouped"))
                  "groups get headings and visible columns align on their widest cells")
-    (let ((heading (first rows))
+    (let ((heading  (first rows))
           (selected (third rows))
-          (spanned (sixth rows)))
+          (spanned  (sixth rows)))
       (test-assert (equal (span-role (first heading)) ':strong)
                    "group headings use the heading role")
       (test-assert (and (equal (first selected) (make-span ':brand "▸ "))

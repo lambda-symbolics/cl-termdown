@@ -20,7 +20,7 @@
 (-> selector-table--padded (list integer keyword) list)
 (defun selector-table--padded (spans width role)
   "Return SPANS fitted to exactly WIDTH cells, padded with a ROLE span."
-  (let* ((fitted (fit-spans spans width))
+  (let* ((fitted  (fit-spans spans width))
          (padding (- width (spans-width fitted))))
     (if (plusp padding)
         (append fitted
@@ -65,17 +65,17 @@ When GROUP-FUNCTION returns a group different from the previous row's, a
 HEADING-ROLE row naming it precedes the candidate, after an empty row unless it
 is the first group."
   (unless (eq (clinedi:selector-arrangement selector) ':vertical)
-    (error 'type-error :datum (clinedi:selector-arrangement selector)
+    (error 'type-error :datum         (clinedi:selector-arrangement selector)
                        :expected-type '(eql :vertical)))
-  (let* ((marker-width (max (text-cell-width selected-marker) (text-cell-width marker)))
-         (indexes (mapcar #'first
-                          (clinedi:selector-arrange
-                           selector width
-                           :width-function (lambda (item)
-                                             (text-cell-width
-                                              (funcall label-function item))))))
-         (items (clinedi:selector-items selector))
-         (entries (mapcar (lambda (index) (nth index items)) indexes))
+  (let* ((marker-width   (max (text-cell-width selected-marker) (text-cell-width marker)))
+         (indexes        (mapcar #'first
+                                 (clinedi:selector-arrange
+                                  selector width
+                                  :width-function (lambda (item)
+                                                    (text-cell-width
+                                                     (funcall label-function item))))))
+         (items          (clinedi:selector-items selector))
+         (entries        (mapcar (lambda (index) (nth index items)) indexes))
          (column-cells
            (remove-if (lambda (cells)
                         (every (lambda (spans) (zerop (spans-width spans))) cells))
@@ -91,11 +91,11 @@ is the first group."
                                                     collect (spans-text (nth row cells)
                                                                         :single-line-p t))))
                           (max 0 (- width marker-width))
-                          :gap-width gap-width
+                          :gap-width      gap-width
                           :minimum-widths (cons 1 (make-list (length column-cells)
                                                              :initial-element 0))))
-         (gap (make-string gap-width :initial-element #\Space))
-         (indent (make-string marker-width :initial-element #\Space))
+         (gap            (make-string gap-width :initial-element #\Space))
+         (indent         (make-string marker-width :initial-element #\Space))
          (previous-group nil))
     (loop for index in indexes
           for entry in entries
