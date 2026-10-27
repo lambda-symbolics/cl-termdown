@@ -10,12 +10,24 @@ if [ ! -r "$root/.qlot/setup.lisp" ]; then
   exit 1
 fi
 
-CL_SOURCE_REGISTRY="(:source-registry (:tree \"$root/\") :ignore-inherited-configuration)"
-export CL_SOURCE_REGISTRY
+tests=0
+case " $* " in
+  *" --fix "*) ;;
+  *)
+    CL_SOURCE_REGISTRY="(:source-registry (:tree \"$root/\") :ignore-inherited-configuration)" \
+      sbcl --noinform --no-userinit --no-sysinit --non-interactive \
+      --load "$root/.qlot/setup.lisp" \
+      --eval '(require :asdf)' \
+      --eval '(asdf:load-asd (truename "cl-termdown.asd"))' \
+      --eval '(unless (equal (truename (asdf:system-source-file "cl-termdown")) (truename "cl-termdown.asd")) (error "Resolved cl-termdown outside this checkout: ~A" (asdf:system-source-file "cl-termdown")))' \
+      --eval '(asdf:test-system "cl-termdown")' || tests=$?
+    ;;
+esac
 
-exec sbcl --noinform --no-userinit --no-sysinit --non-interactive \
-  --load "$root/.qlot/setup.lisp" \
-  --eval '(require :asdf)' \
-  --eval '(asdf:load-asd (truename "cl-termdown.asd"))' \
-  --eval '(unless (equal (truename (asdf:system-source-file "cl-termdown")) (truename "cl-termdown.asd")) (error "Resolved cl-termdown outside this checkout: ~A" (asdf:system-source-file "cl-termdown")))' \
-  --eval '(asdf:test-system "cl-termdown")'
+source=0
+sbcl --script "$root/script/check-source.lisp" "$@" || source=$?
+
+if [ "$tests" -ne 0 ]; then
+  exit "$tests"
+fi
+exit "$source"
