@@ -75,14 +75,20 @@ Call =markdown-render-line= when a newline commits that logical line.
 Semantic roles include =:plain=, =:brand=, =:dim=, =:strong=, =:emphasis=,
 =:code=, =:code-copy=, =:notice=, and the =:syntax-*= roles produced by Colordiff.
 
-* Tests
+* Development
 
 #+BEGIN_SRC sh
 ./script/bootstrap
 ./script/check
+./script/check --fix
 #+END_SRC
 
-=script/check= runs =CL-TERMDOWN/TESTS= in an isolated source registry.
+=./script/check= runs =CL-TERMDOWN/TESTS= in an isolated source registry, then
+checks the source with [[https://github.com/lambda-symbolics/cheque][cheque]] as
+=cheque.sexp= configures it. =--fix= skips the tests and repairs what cheque can
+repair. cheque and its tools are development dependencies: =checks/qlfile=
+lists them, and the check installs them on first use into
+=~/.cache/cheque/tools/=.
 
 * Dependencies
 
