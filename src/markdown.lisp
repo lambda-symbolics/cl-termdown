@@ -596,12 +596,40 @@ inline Markdown styling."
                             row)))
             rows)))
 
+(defvar *markdown-preview-p* nil
+  "Whether the current render is speculative and must omit failure notices.")
+
+(defun markdown--mermaid-notice (renderer reason)
+  "Return sanitized, cell-wrapped notice rows for a confirmed Mermaid failure."
+  (unless *markdown-preview-p*
+    (mapcar (lambda (text) (list (make-span :notice text)))
+            (wrap-text (sanitize-text
+                        (format nil "Mermaid source fallback: ~A" reason)
+                        :single-line-p t)
+                       (markdown-renderer-width renderer)))))
+
+(defun markdown--mermaid-error-notice (renderer condition)
+  "Present Clermaid's typed failure category and condition report as a notice."
+  (markdown--mermaid-notice
+   renderer
+   (format nil "~A: ~A"
+           (typecase condition
+             (clermaid:unsupported-syntax "unsupported syntax")
+             (clermaid:invalid-diagram "invalid diagram")
+             (clermaid:diagram-too-wide "terminal width")
+             (clermaid:resource-limit-exceeded "resource limit")
+             (t "rendering error"))
+           condition)))
+
 (defun markdown--close-mermaid (renderer)
   (let* ((body (markdown--mermaid-source renderer))
          (source-lines (reverse (markdown-renderer-mermaid-source renderer)))
+         (notice nil)
          (rows (handler-case
                    (markdown--mermaid-rows renderer body)
-                 (mermaid-error () nil))))
+                 (mermaid-error (condition)
+                   (setf notice (markdown--mermaid-error-notice renderer condition))
+                   nil))))
     (setf (markdown-renderer-closed-code-source renderer) body
           (markdown-renderer-code-open-p renderer) nil
           (markdown-renderer-code-language renderer) nil
@@ -611,7 +639,8 @@ inline Markdown styling."
         (append rows
                 (list (list (make-span ':dim "  ``` ")
                             (make-span ':code-copy "⧉ copy"))))
-        (markdown--ordinary-fence-rows renderer (append source-lines (list "```"))))))
+        (append notice
+                (markdown--ordinary-fence-rows renderer (append source-lines (list "```")))))))
 
 (-> markdown-render-line (markdown-renderer string) list)
 (defun markdown-render-line (renderer line)
@@ -643,7 +672,10 @@ inline Markdown styling."
          (if (> new-length 65536)
              (let* ((source-lines (reverse (markdown-renderer-mermaid-source renderer)))
                     (body-lines (rest source-lines))
-                    (rows (list (list (make-span ':dim (first source-lines))))))
+                    (rows (append
+                           (markdown--mermaid-notice
+                            renderer "source limit exceeded (65536 characters).")
+                           (list (list (make-span ':dim (first source-lines)))))))
                (setf (markdown-renderer-mermaid-buffer-p renderer) nil
                      (markdown-renderer-mermaid-source-length renderer) 0
                      (markdown-renderer-mermaid-source renderer) nil
@@ -679,7 +711,12 @@ inline Markdown styling."
                    (markdown-renderer-mermaid-source-length renderer)
                    (+ 1 (length line)))
              nil)
-           (list (list (make-span ':dim (format nil "  ```~A" language))))))
+           (append
+            (when (and (not (markdown-renderer-raw-fence-p renderer))
+                       (markdown--mermaid-p language))
+              (markdown--mermaid-notice
+               renderer "source limit exceeded (65536 characters)."))
+            (list (list (make-span ':dim (format nil "  ```~A" language)))))))
       ((zerop (length (string-trim " " line)))
        (markdown--reset-table renderer)
        (list nil))
@@ -717,7 +754,8 @@ The operation resets only buffered Mermaid state and is idempotent."
 (-> markdown-render-partial (markdown-renderer string) (values list list string))
 (defun markdown-render-partial (renderer partial)
   "Return no committed rows, speculative live rows, and retained PARTIAL."
-  (let ((preview-renderer (markdown--copy-renderer renderer)))
+  (let ((preview-renderer (markdown--copy-renderer renderer))
+        (*markdown-preview-p* t))
     (if (and (markdown-renderer-code-open-p preview-renderer)
              (markdown-renderer-mermaid-buffer-p preview-renderer))
         (let* ((lines (reverse (markdown-renderer-mermaid-source preview-renderer)))
