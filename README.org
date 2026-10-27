@@ -106,3 +106,17 @@ A source-limit diagnostic appears as soon as a fence exceeds the buffering limit
 Open diagrams appear only in speculative previews. Call =markdown-render-finish=
 at the end of a document or interrupted stream to display incomplete source.
 See Clermaid's README for the supported syntax.
+
+Flowchart subgraphs render as labeled frames, including nested groups and edges
+between grouped nodes. For example:
+
+#+BEGIN_SRC mermaid
+flowchart TD
+  subgraph Local["Local machine"]
+    C[Client] --> S[Server]
+  end
+  S --> R[Remote]
+#+END_SRC
+
+Clermaid parses the groups and draws their frames and connections. Use the same
+Markdown rendering API for grouped and ungrouped diagrams.
