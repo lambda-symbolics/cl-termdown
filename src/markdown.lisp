@@ -564,25 +564,34 @@ inline Markdown styling."
                                       :end                   (+ start (length row-text))) rows)
           (setf cursor (+ start (length row-text))))))))
 
+(-> markdown--mermaid-p ((option string)) boolean)
 (defun markdown--mermaid-p (language)
+  "Return T when the fence LANGUAGE names Mermaid."
   (and language (string-equal language "mermaid")))
 
+(-> markdown--mermaid-source (markdown-renderer) string)
 (defun markdown--mermaid-source (renderer)
+  "Return the body of RENDERER's buffered Mermaid fence, without its opening line."
   (let ((lines (reverse (markdown-renderer-mermaid-source renderer))))
     (format nil "~{~A~^~%~}" (rest lines))))
 
+(-> markdown--ordinary-fence-rows (markdown-renderer list) list)
 (defun markdown--ordinary-fence-rows (renderer lines)
+  "Return LINES rendered as an ordinary fenced code block at RENDERER's width."
   (let ((copy (markdown-renderer-create :width      (markdown-renderer-width renderer)
                                        :raw-fence-p t))
         (rows nil))
     (dolist (line lines (nreverse rows))
       (setf rows (nconc (nreverse (markdown-render-line copy line)) rows)))))
 
+(-> markdown--clear-mermaid (markdown-renderer) null)
 (defun markdown--clear-mermaid (renderer)
+  "Discard RENDERER's buffered Mermaid fence."
   (setf (markdown-renderer-mermaid-buffer-p renderer) nil
         (markdown-renderer-mermaid-source-length renderer) 0
         (markdown-renderer-mermaid-source renderer) nil))
 
+(-> markdown--mermaid-rows (markdown-renderer string) list)
 (defun markdown--mermaid-rows (renderer source)
   "Render Mermaid source through Clermaid's direct semantic-span API."
   (let ((rows (render-mermaid-spans
@@ -597,6 +606,7 @@ inline Markdown styling."
 (defvar *markdown-preview-p* nil
   "Whether the current render is speculative and must omit failure notices.")
 
+(-> markdown--mermaid-notice (markdown-renderer string) list)
 (defun markdown--mermaid-notice (renderer reason)
   "Return sanitized, cell-wrapped notice rows for a confirmed Mermaid failure."
   (unless *markdown-preview-p*
@@ -606,6 +616,7 @@ inline Markdown styling."
                         :single-line-p t)
                        (markdown-renderer-width renderer)))))
 
+(-> markdown--mermaid-error-notice (markdown-renderer condition) list)
 (defun markdown--mermaid-error-notice (renderer condition)
   "Present Clermaid's typed failure category and condition report as a notice."
   (markdown--mermaid-notice
@@ -624,7 +635,12 @@ inline Markdown styling."
               "rendering error"))
            condition)))
 
+(-> markdown--close-mermaid (markdown-renderer) list)
 (defun markdown--close-mermaid (renderer)
+  "Close RENDERER's Mermaid fence and return its diagram rows.
+
+When Clermaid cannot render the diagram, return a notice followed by the
+source as an ordinary fenced code block."
   (let* ((body         (markdown--mermaid-source renderer))
          (source-lines (reverse (markdown-renderer-mermaid-source renderer)))
          (notice       nil)
