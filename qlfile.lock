@@ -18,14 +18,22 @@
  (:class qlot/source/ql:source-ql
   :initargs (:%version "2026-01-01")
   :version "ql-2026-01-01"))
+("bordeaux-threads" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version "2026-01-01")
+  :version "ql-2024-10-12"))
+("trivial-gray-streams" .
+ (:class qlot/source/ql:source-ql
+  :initargs (:%version "2026-01-01")
+  :version "ql-2024-10-12"))
 ("cl-colorist" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/lambda-symbolics/cl-colorist.git" :ref "a4b65e63f40248c091d8ccf6023ad6fef5de7f0d")
   :version "git-a4b65e63f40248c091d8ccf6023ad6fef5de7f0d"))
 ("clinedi" .
  (:class qlot/source/git:source-git
-  :initargs (:remote-url "https://github.com/lambda-symbolics/clinedi.git" :ref "17c6cbbeebd541529b21f0fb572099cf1509a106")
-  :version "git-17c6cbbeebd541529b21f0fb572099cf1509a106"))
+  :initargs (:remote-url "https://github.com/lambda-symbolics/clinedi.git" :ref "a7b257ac68296a349b83e238290616574ee0136b")
+  :version "git-a7b257ac68296a349b83e238290616574ee0136b"))
 ("clermaid" .
  (:class qlot/source/git:source-git
   :initargs (:remote-url "https://github.com/lambda-symbolics/clermaid.git" :ref "adda288e76c2116da99c611af22442ad7c277756")

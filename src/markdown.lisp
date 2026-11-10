@@ -130,14 +130,45 @@
          (not (char= (char text after) #\Space))
          (not (null (markdown--inline-close-position text after marker))))))
 
+(-> markdown--escaped-p (string integer) boolean)
+(defun markdown--escaped-p (text index)
+  "Return true when TEXT's character at INDEX has an odd preceding slash run."
+  (let ((slashes 0)
+        (cursor  (1- index)))
+    (loop while (and (>= cursor 0) (char= (char text cursor) #\\))
+          do (incf slashes)
+             (decf cursor))
+    (oddp slashes)))
+
+(-> markdown--escapable-p (character) boolean)
+(defun markdown--escapable-p (character)
+  "Return true when CHARACTER may be escaped in Markdown text."
+    (not (null (find character "\\`*_{}[]()#+-.!<>|~" :test #'char=))))
+
+(-> markdown--unescape (string) string)
+(defun markdown--unescape (text)
+  "Remove Markdown escapes without changing backslashes before ordinary text."
+  (with-output-to-string (stream)
+    (loop for index from 0 below (length text)
+          for character = (char text index)
+          do (if (and (char= character #\\)
+                      (< (1+ index) (length text))
+                      (markdown--escapable-p (char text (1+ index))))
+                 (progn
+                   (write-char (char text (1+ index)) stream)
+                   (incf index))
+                 (write-char character stream)))))
+
 (-> markdown--link-at (string integer)
     (values (option integer) (option string) (option string)))
 (defun markdown--link-at (text index)
   "Return the end, label, and destination of a link beginning at INDEX.
 
-Bracket and parenthesis nesting is accepted, with backslash escapes. Unsafe or
+Bracket and parenthesis nesting is accepted, with Markdown escapes. Unsafe or
 control-bearing destinations are rejected rather than passed to a terminal."
-  (when (and (< index (length text)) (char= (char text index) #\[))
+  (when (and (< index (length text))
+             (char= (char text index) #\[)
+             (not (markdown--escaped-p text index)))
     (let ((depth 1) (cursor (1+ index)) (close nil))
       (loop while (< cursor (length text))
             do (cond
@@ -174,21 +205,17 @@ control-bearing destinations are rejected rather than passed to a terminal."
                      (t
                       (incf url-end))))
           (when (and (< url-end (length text)) (zerop paren-depth))
-            (let ((url (subseq text url-start url-end)))
+            (let ((url (markdown--unescape (subseq text url-start url-end))))
               (when (and (plusp (length url))
                          (not (find-if (lambda (character)
-                                         (or (char= character #\Escape)
-                                             (< (char-code character) 32)
+                                         (or (< (char-code character) 32)
                                              (= (char-code character) 127)))
                                        url))
                          (or (uiop:string-prefix-p "https://" url)
                              (uiop:string-prefix-p "http://" url)
                              (uiop:string-prefix-p "mailto:" url)))
                 (values (1+ url-end)
-                        (with-output-to-string (stream)
-                          (loop for character across (subseq text (1+ index) close)
-                                unless (char= character #\\)
-                                  do (write-char character stream)))
+                        (markdown--unescape (subseq text (1+ index) close))
                         url)))))))))
 
 (-> markdown--parse-inline (string) (values string vector))
@@ -232,23 +259,30 @@ retained in style descriptors for the row's widget conversion."
                       (progn (setf mode ':plain) (incf index))
                       (emit)))
                  ((eq mode ':plain)
-                  (multiple-value-bind (end label url) (markdown--link-at text index)
-                    (if end
-                        (progn
-                          (loop for character across label
-                                do (vector-push-extend character rendered)
-                                   (vector-push-extend (cons ':link url) styles))
-                          (setf index end))
-                        (cond
-                          ((and (marker-p "**")
-                                (markdown--inline-openable-p text index "**"))
-                           (setf mode ':strong) (incf index 2))
-                          ((and (char= (char text index) #\*)
-                                (not (marker-p "**"))
-                                (markdown--inline-openable-p text index "*"))
-                           (setf mode ':emphasis) (incf index))
-                          (t
-                           (emit)))))))))
+                  (if (and (char= (char text index) #\\)
+                           (< (1+ index) (length text))
+                           (markdown--escapable-p (char text (1+ index))))
+                      (progn
+                        (incf index)
+                        (emit)
+                        (incf index))
+                      (multiple-value-bind (end label url) (markdown--link-at text index)
+                        (if end
+                            (progn
+                              (loop for character across label
+                                    do (vector-push-extend character rendered)
+                                       (vector-push-extend (cons ':link url) styles))
+                              (setf index end))
+                            (cond
+                              ((and (marker-p "**")
+                                    (markdown--inline-openable-p text index "**"))
+                               (setf mode ':strong) (incf index 2))
+                              ((and (char= (char text index) #\*)
+                                    (not (marker-p "**"))
+                                    (markdown--inline-openable-p text index "*"))
+                               (setf mode ':emphasis) (incf index))
+                              (t
+                               (emit))))))))))
     (values (coerce rendered 'string) styles)))
 
 (-> markdown--style-span (t string) t)

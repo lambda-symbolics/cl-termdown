@@ -150,17 +150,23 @@ characters occur in adjacent spans. Widgets become the spans of their labels."
 
 (-> render-spans (list &key (:style-function (option function))) string)
 (defun render-spans (spans &key style-function)
-  "Return sanitized presentation for SPANS, adding OSC 8 links when styled."
+  "Return sanitized presentation for SPANS, adding OSC 8 links when styled.
+
+Link widgets are wrapped with CLINEDI:ANSI-HYPERLINK after styling.  A style
+function should recognize the :LINK role and avoid adding a second hyperlink
+around its text."
   (with-output-to-string (stream)
     (dolist (item spans)
       (let* ((widget       (widget-p item))
              (span         (if widget (make-span (widget-role item) (widget-label item)) item))
              (text         (sanitize-text (span-text span)))
              (presentation (if style-function
-                                 (funcall style-function (span-role span) text)
-                                 text)))
+                               (funcall style-function (span-role span) text)
+                               text)))
         (if (and style-function widget
                  (consp (widget-action item))
                  (eq (first (widget-action item)) ':open-url))
-            (format stream "~C]8;;~A~C~A~C]8;;~C" #\Escape (second (widget-action item)) #\Bel presentation #\Escape #\Bel)
+            (write-string (ansi-hyperlink presentation
+                                           (second (widget-action item)))
+                          stream)
             (write-string presentation stream))))))

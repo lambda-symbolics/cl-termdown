@@ -2,6 +2,7 @@
   (:documentation "Render Markdown as semantic spans for terminals.")
   (:use #:cl)
   (:import-from #:clinedi
+                #:ansi-hyperlink
                 #:sanitize-text
                 #:text-cell-width
                 #:wrap-text)

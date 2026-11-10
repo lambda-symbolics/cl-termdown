@@ -2,6 +2,7 @@
   (:documentation "Test the termdown package.")
   (:use #:cl)
   (:import-from #:clinedi
+                #:*presentation-enabled*
                 #:text-cell-width)
   (:import-from #:serapeum
                 #:->)
@@ -371,16 +372,34 @@
     (test-assert (and link (equal (widget-action link) '(:open-url "https://example.com/x")))
                  "markdown links retain their destination as an action")
     (test-assert (not (find #\Escape (render-spans row))) "plain rendering emits no terminal controls")
-    (test-assert (search (format nil "~C]8;;https://example.com/x~Cdocs~C]8;;~C" #\Escape #\Bel #\Escape #\Bel)
-                         (render-spans row :style-function (lambda (role text) (declare (ignore role)) text)))
-                 "styled rendering emits an OSC 8 hyperlink")
+    (let ((*presentation-enabled* t))
+      (let ((styled (render-spans row :style-function
+                                  (lambda (role text) (declare (ignore role)) text))))
+        (test-assert (and (search (format nil "~C]8;;https://example.com/x" #\Escape)
+                                 styled)
+                          (search "docs" styled))
+                    "styled rendering emits an OSC 8 hyperlink")))
     (test-assert (string= (spans-text (first (markdown-render-inline "`[code](https://example.com)`" 80)))
                           "[code](https://example.com)")
                  "code spans do not create links")
     (test-assert (string= (spans-text (first (markdown-render-inline "[bad](javascript:alert(1))" 80)))
                           "[bad](javascript:alert(1))")
-                 "unsafe URL schemes remain visible text"))
-  nil)
+                 "unsafe URL schemes remain visible text")
+    (test-assert (not (find-if #'widget-p
+                                (first (markdown-render-inline "\\[docs](https://example.com)" 80))))
+                 "escaped opening brackets do not create links")
+    (test-assert (string= (spans-text (first (markdown-render-inline "[a [nested]](https://example.com)" 80)))
+                          "a [nested]")
+                 "nested link labels are parsed and unescaped")
+    (let ((rows (markdown-render-inline "[a long visible label](https://example.com)" 12)))
+      (test-assert (every (lambda (row) (<= (spans-width row) 12)) rows)
+                   "link wrapping uses visible label width"))
+    (let* ((row                    (first (markdown-render-inline "[unicode](https://例え.example/)" 80)))
+           (*presentation-enabled* t)
+           (styled                 (render-spans row :style-function
+                                                 (lambda (role text) (declare (ignore role)) text))))
+      (test-assert (not (find #\Escape styled))
+                   "non-ASCII destinations remain plain text"))))
 
 (-> run-tests () boolean)
 (defun run-tests ()
