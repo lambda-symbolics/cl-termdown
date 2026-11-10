@@ -130,73 +130,133 @@
          (not (char= (char text after) #\Space))
          (not (null (markdown--inline-close-position text after marker))))))
 
+(-> markdown--link-at (string integer)
+    (values (option integer) (option string) (option string)))
+(defun markdown--link-at (text index)
+  "Return the end, label, and destination of a link beginning at INDEX.
+
+Bracket and parenthesis nesting is accepted, with backslash escapes. Unsafe or
+control-bearing destinations are rejected rather than passed to a terminal."
+  (when (and (< index (length text)) (char= (char text index) #\[))
+    (let ((depth 1) (cursor (1+ index)) (close nil))
+      (loop while (< cursor (length text))
+            do (cond
+                 ((and (char= (char text cursor) #\\)
+                       (< (1+ cursor) (length text)))
+                  (incf cursor 2))
+                 ((char= (char text cursor) #\[)
+                  (incf depth) (incf cursor))
+                 ((char= (char text cursor) #\])
+                  (decf depth)
+                  (if (zerop depth)
+                      (setf close cursor cursor (1+ cursor))
+                      (incf cursor)))
+                 (t
+                  (incf cursor)))
+            when close do (return))
+      (when (and close (< cursor (length text))
+                 (char= (char text cursor) #\())
+        (let ((url-start   (1+ cursor))
+              (url-end     (1+ cursor))
+              (paren-depth 1))
+          (loop while (< url-end (length text))
+                do (cond
+                     ((and (char= (char text url-end) #\\)
+                           (< (1+ url-end) (length text)))
+                      (incf url-end 2))
+                     ((char= (char text url-end) #\()
+                      (incf paren-depth) (incf url-end))
+                     ((char= (char text url-end) #\))
+                      (decf paren-depth)
+                      (if (zerop paren-depth)
+                          (return)
+                          (incf url-end)))
+                     (t
+                      (incf url-end))))
+          (when (and (< url-end (length text)) (zerop paren-depth))
+            (let ((url (subseq text url-start url-end)))
+              (when (and (plusp (length url))
+                         (not (find-if (lambda (character)
+                                         (or (char= character #\Escape)
+                                             (< (char-code character) 32)
+                                             (= (char-code character) 127)))
+                                       url))
+                         (or (uiop:string-prefix-p "https://" url)
+                             (uiop:string-prefix-p "http://" url)
+                             (uiop:string-prefix-p "mailto:" url)))
+                (values (1+ url-end)
+                        (with-output-to-string (stream)
+                          (loop for character across (subseq text (1+ index) close)
+                                unless (char= character #\\)
+                                  do (write-char character stream)))
+                        url)))))))))
+
 (-> markdown--parse-inline (string) (values string vector))
 (defun markdown--parse-inline (text)
   "Return TEXT without inline markers plus per-character styles.
 
-Recognizes `code`, **strong**, and *emphasis* spans whose delimiters pair
-within TEXT. Unpaired delimiters stay literal."
-  (let ((rendered         (make-array (length text)
-                                      :element-type 'character
-                                      :adjustable   t
-                                      :fill-pointer 0))
-        (styles           (make-array (length text) :adjustable t :fill-pointer 0))
-        (mode             ':plain)
-        (code-return-mode ':plain)
-        (index            0))
-    (labels ((emit ()
-               "Copy the current source character with the active style."
+Recognizes code, links, strong, and emphasis spans. Link destinations are
+retained in style descriptors for the row's widget conversion."
+  (let ((rendered (make-array (length text) :element-type 'character
+                              :adjustable t :fill-pointer 0))
+        (styles   (make-array (length text) :adjustable t :fill-pointer 0))
+        (mode ':plain) (code-return-mode ':plain) (index 0))
+    (labels ((emit (&optional (style mode))
                (vector-push-extend (char text index) rendered)
-               (vector-push-extend mode styles)
+               (vector-push-extend style styles)
                (incf index))
 
              (marker-p (marker)
-               "Return true when MARKER occurs at the current index."
                (let ((end (+ index (length marker))))
                  (and (<= end (length text))
                       (string= text marker :start1 index :end1 end))))
 
              (closable-p ()
-               "Return true when a closing delimiter is valid at this index."
                (and (plusp index)
                     (not (char= (char text (1- index)) #\Space)))))
       (loop while (< index (length text))
             do (cond
                  ((eq mode ':code)
                   (if (char= (char text index) #\`)
-                      (progn
-                        (setf mode code-return-mode)
-                        (incf index))
+                      (progn (setf mode code-return-mode) (incf index))
                       (emit)))
                  ((and (char= (char text index) #\`)
                        (position #\` text :start (1+ index)))
-                  (setf code-return-mode mode
-                        mode ':code)
-                  (incf index))
+                  (setf code-return-mode mode mode ':code) (incf index))
                  ((eq mode ':strong)
                   (if (and (marker-p "**") (closable-p))
-                      (progn
-                        (setf mode ':plain)
-                        (incf index 2))
+                      (progn (setf mode ':plain) (incf index 2))
                       (emit)))
                  ((eq mode ':emphasis)
                   (if (and (char= (char text index) #\*) (closable-p))
-                      (progn
-                        (setf mode ':plain)
-                        (incf index))
+                      (progn (setf mode ':plain) (incf index))
                       (emit)))
-                 ((and (marker-p "**")
-                       (markdown--inline-openable-p text index "**"))
-                  (setf mode ':strong)
-                  (incf index 2))
-                 ((and (char= (char text index) #\*)
-                       (not (marker-p "**"))
-                       (markdown--inline-openable-p text index "*"))
-                  (setf mode ':emphasis)
-                  (incf index))
-                 (t
-                  (emit)))))
+                 ((eq mode ':plain)
+                  (multiple-value-bind (end label url) (markdown--link-at text index)
+                    (if end
+                        (progn
+                          (loop for character across label
+                                do (vector-push-extend character rendered)
+                                   (vector-push-extend (cons ':link url) styles))
+                          (setf index end))
+                        (cond
+                          ((and (marker-p "**")
+                                (markdown--inline-openable-p text index "**"))
+                           (setf mode ':strong) (incf index 2))
+                          ((and (char= (char text index) #\*)
+                                (not (marker-p "**"))
+                                (markdown--inline-openable-p text index "*"))
+                           (setf mode ':emphasis) (incf index))
+                          (t
+                           (emit)))))))))
     (values (coerce rendered 'string) styles)))
+
+(-> markdown--style-span (t string) t)
+(defun markdown--style-span (style text)
+  "Turn a parser style and visible text into a span or link widget."
+  (if (and (consp style) (eq (first style) ':link))
+      (make-widget ':link text (list ':open-url (rest style)))
+      (make-span style text)))
 
 (-> markdown--style-runs
     (string vector &key (:start integer) (:end integer))
@@ -207,14 +267,14 @@ within TEXT. Unpaired delimiters stay literal."
         (run-start start))
     (loop for position from start below end
           when (and (> position run-start)
-                    (not (eq (aref styles position)
-                             (aref styles (1- position)))))
-            do (push (make-span (aref styles (1- position))
-                                (subseq rendered run-start position))
+                    (not (equal (aref styles position)
+                                (aref styles (1- position)))))
+            do (push (markdown--style-span (aref styles (1- position))
+                                           (subseq rendered run-start position))
                      spans)
                (setf run-start position))
     (when (< run-start end)
-      (push (make-span (aref styles (1- end))
+      (push (markdown--style-span (aref styles (1- end))
                        (subseq rendered run-start end))
             spans))
     (nreverse spans)))

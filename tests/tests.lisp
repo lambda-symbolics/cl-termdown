@@ -7,6 +7,10 @@
                 #:->)
   (:import-from #:termdown
                 #:make-span
+                #:render-spans
+                #:spans-text
+                #:widget-action
+                #:widget-p
                 #:markdown-render-inline
                 #:markdown-render-line
                 #:markdown-render-partial
@@ -358,6 +362,26 @@
                  "the committed closing fence exposes exactly the committed lines"))
   nil)
 
+(-> test-markdown-links () null)
+(defun test-markdown-links ()
+  "Test link labels, plain rendering, OSC 8 presentation, and unsafe URLs."
+  (let* ((row  (first (markdown-render-inline "See [docs](https://example.com/x)." 80)))
+         (link (find-if #'widget-p row)))
+    (test-assert (string= (spans-text row) "See docs.") "markdown links expose only their labels")
+    (test-assert (and link (equal (widget-action link) '(:open-url "https://example.com/x")))
+                 "markdown links retain their destination as an action")
+    (test-assert (not (find #\Escape (render-spans row))) "plain rendering emits no terminal controls")
+    (test-assert (search (format nil "~C]8;;https://example.com/x~Cdocs~C]8;;~C" #\Escape #\Bel #\Escape #\Bel)
+                         (render-spans row :style-function (lambda (role text) (declare (ignore role)) text)))
+                 "styled rendering emits an OSC 8 hyperlink")
+    (test-assert (string= (spans-text (first (markdown-render-inline "`[code](https://example.com)`" 80)))
+                          "[code](https://example.com)")
+                 "code spans do not create links")
+    (test-assert (string= (spans-text (first (markdown-render-inline "[bad](javascript:alert(1))" 80)))
+                          "[bad](javascript:alert(1))")
+                 "unsafe URL schemes remain visible text"))
+  nil)
+
 (-> run-tests () boolean)
 (defun run-tests ()
   "Run all cl-termdown tests and return true on success."
@@ -367,6 +391,7 @@
   (test-span-presentation)
   (test-widget-regions)
   (test-markdown-inline-spans)
+  (test-markdown-links)
   (test-markdown-lists)
   (test-markdown-code-blocks)
   (test-markdown-tables)

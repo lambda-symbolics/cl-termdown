@@ -150,14 +150,17 @@ characters occur in adjacent spans. Widgets become the spans of their labels."
 
 (-> render-spans (list &key (:style-function (option function))) string)
 (defun render-spans (spans &key style-function)
-  "Return presentation for SPANS and widgets using an optional trusted STYLE-FUNCTION.
-
-STYLE-FUNCTION receives the semantic role and sanitized text of each span,
-and returns its trusted presentation. Without it, return plain visible text."
+  "Return sanitized presentation for SPANS, adding OSC 8 links when styled."
   (with-output-to-string (stream)
-    (dolist (span (presentation-spans spans))
-      (let ((text (sanitize-text (span-text span))))
-        (write-string (if style-function
-                          (funcall style-function (span-role span) text)
-                          text)
-                      stream)))))
+    (dolist (item spans)
+      (let* ((widget       (widget-p item))
+             (span         (if widget (make-span (widget-role item) (widget-label item)) item))
+             (text         (sanitize-text (span-text span)))
+             (presentation (if style-function
+                                 (funcall style-function (span-role span) text)
+                                 text)))
+        (if (and style-function widget
+                 (consp (widget-action item))
+                 (eq (first (widget-action item)) ':open-url))
+            (format stream "~C]8;;~A~C~A~C]8;;~C" #\Escape (second (widget-action item)) #\Bel presentation #\Escape #\Bel)
+            (write-string presentation stream))))))
