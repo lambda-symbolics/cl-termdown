@@ -366,6 +366,33 @@
 (-> test-markdown-links () null)
 (defun test-markdown-links ()
   "Test link labels, plain rendering, OSC 8 presentation, and unsafe URLs."
+  (dolist (specification '(("**" :strong) ("*" :emphasis)))
+    (destructuring-bind (marker role) specification
+      (dolist (prefix '("" "1. " "- "))
+        (let* ((source (format nil "~A~Abefore [docs](https://example.com/x) after~A"
+                               prefix marker marker))
+               (row    (first (markdown-render-line
+                               (markdown-renderer-create :width 80) source)))
+               (link   (find-if #'widget-p row)))
+          (test-assert (search "before docs after" (spans-text row))
+                       "emphasized links render their labels in paragraphs and lists")
+          (test-assert (and link
+                            (equal (widget-action link)
+                                   '(:open-url "https://example.com/x")))
+                       "emphasized links retain their explicit destination")
+          (test-assert (and (find (make-span role "before ") row :test #'equal)
+                            (find (make-span role " after") row :test #'equal))
+                       "surrounding text retains its emphasis on both sides of a link")))
+      (dolist (specification
+               '(("[bad](javascript:alert(1))" "[bad](javascript:alert(1))")
+                 ("[broken](https://example.com" "[broken](https://example.com")
+                 ("`[code](https://example.com)`" "[code](https://example.com)")))
+        (destructuring-bind (source expected) specification
+          (let ((row (first (markdown-render-inline
+                             (format nil "~A~A~A" marker source marker) 80))))
+            (test-assert (and (string= (spans-text row) expected)
+                              (not (find-if #'widget-p row)))
+                         "unsafe, incomplete, and code links inside emphasis render literally"))))))
   (let* ((row  (first (markdown-render-inline "See [docs](https://example.com/x)." 80)))
          (link (find-if #'widget-p row)))
     (test-assert (string= (spans-text row) "See docs.") "markdown links expose only their labels")

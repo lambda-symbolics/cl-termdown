@@ -238,6 +238,15 @@ retained in style descriptors for the row's widget conversion."
                  (and (<= end (length text))
                       (string= text marker :start1 index :end1 end))))
 
+             (emit-link ()
+               (multiple-value-bind (end label url) (markdown--link-at text index)
+                 (when end
+                   (loop for character across label
+                         do (vector-push-extend character rendered)
+                            (vector-push-extend (cons ':link url) styles))
+                   (setf index end)
+                   t)))
+
              (closable-p ()
                (and (plusp index)
                     (not (char= (char text (1- index)) #\Space)))))
@@ -250,6 +259,8 @@ retained in style descriptors for the row's widget conversion."
                  ((and (char= (char text index) #\`)
                        (position #\` text :start (1+ index)))
                   (setf code-return-mode mode mode ':code) (incf index))
+                 ((emit-link)
+                  nil)
                  ((eq mode ':strong)
                   (if (and (marker-p "**") (closable-p))
                       (progn (setf mode ':plain) (incf index 2))
@@ -266,23 +277,16 @@ retained in style descriptors for the row's widget conversion."
                         (incf index)
                         (emit)
                         (incf index))
-                      (multiple-value-bind (end label url) (markdown--link-at text index)
-                        (if end
-                            (progn
-                              (loop for character across label
-                                    do (vector-push-extend character rendered)
-                                       (vector-push-extend (cons ':link url) styles))
-                              (setf index end))
-                            (cond
-                              ((and (marker-p "**")
-                                    (markdown--inline-openable-p text index "**"))
-                               (setf mode ':strong) (incf index 2))
-                              ((and (char= (char text index) #\*)
-                                    (not (marker-p "**"))
-                                    (markdown--inline-openable-p text index "*"))
-                               (setf mode ':emphasis) (incf index))
-                              (t
-                               (emit))))))))))
+                      (cond
+                        ((and (marker-p "**")
+                              (markdown--inline-openable-p text index "**"))
+                         (setf mode ':strong) (incf index 2))
+                        ((and (char= (char text index) #\*)
+                              (not (marker-p "**"))
+                              (markdown--inline-openable-p text index "*"))
+                         (setf mode ':emphasis) (incf index))
+                        (t
+                         (emit))))))))
     (values (coerce rendered 'string) styles)))
 
 (-> markdown--style-span (t string) t)
