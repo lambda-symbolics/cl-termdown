@@ -444,6 +444,7 @@
   (test-markdown-tables)
   (test-markdown-partial-streaming)
   (test-markdown-mermaid)
+  (test-display-math)
   (test-selector-table-rows)
   (format t "~&~D cl-termdown tests passed.~%" *test-count*)
   t)

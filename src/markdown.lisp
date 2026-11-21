@@ -34,6 +34,12 @@
     :accessor      markdown-renderer-code-source
     :type          list
     :documentation "The open fenced code block's raw lines, newest first.")
+   (math-source
+    :initform nil :accessor markdown-renderer-math-source :type (or list (eql :raw))
+    :documentation "Buffered display lines, newest first, or :RAW after overflow.")
+   (math-size
+    :initform 0 :accessor markdown-renderer-math-size :type (integer 0)
+    :documentation "Buffered character count including line separators.")
    (mermaid-buffer-p
     :initform      nil
     :accessor      markdown-renderer-mermaid-buffer-p
@@ -93,6 +99,10 @@
           (markdown-renderer-code-language renderer)
           (markdown-renderer-code-source copy)
           (copy-list (markdown-renderer-code-source renderer))
+          (markdown-renderer-math-source copy)
+          (markdown-renderer-math-source renderer) ; shared tail is never modified
+          (markdown-renderer-math-size copy)
+          (markdown-renderer-math-size renderer)
           (markdown-renderer-mermaid-buffer-p copy)
           (markdown-renderer-mermaid-buffer-p renderer)
           (markdown-renderer-mermaid-source-length copy)
@@ -776,12 +786,43 @@ source as an ordinary fenced code block."
         (append notice
                 (markdown--ordinary-fence-rows renderer (append source-lines (list "```")))))))
 
+(-> markdown--math-source-rows (markdown-renderer list) list)
+(defun markdown--math-source-rows (renderer lines)
+  "Show literal source without parsing Markdown or discarding delimiters."
+  (loop for line in lines append
+        (loop for part in (or (wrap-text (sanitize-text line) (markdown-renderer-width renderer)) '(""))
+              collect (list (make-span :plain part)))))
+
+(-> markdown--math-line (markdown-renderer string) list)
+(defun markdown--math-line (renderer line)
+  "Buffer a block until its closing delimiter, then render all its rows."
+  (let ((closed (display-math-closed-p (display-math-trim line))))
+    (with-slots (math-source math-size) renderer
+      (cond ((eq math-source :raw)
+             (when closed (setf math-source nil))
+             (markdown--math-source-rows renderer (list line)))
+            (t
+             (push line math-source)
+             (incf math-size (1+ (length line)))
+             (when (or closed (> math-size 65536))
+               (let* ((source (reverse math-source))
+                      (output (when (and closed (<= math-size 65536))
+                                (display-math-lines source (markdown-renderer-width renderer)))))
+                 (setf math-source (unless closed :raw) math-size 0)
+                 (if output
+                     (loop for text in output collect (list (make-span :plain text)))
+                     (markdown--math-source-rows renderer source)))))))))
 (-> markdown-render-line (markdown-renderer string) list)
 (defun markdown-render-line (renderer line)
   "Return sanitized logical LINE as styled transcript rows, updating RENDERER."
   (multiple-value-bind (fence-p language)
       (markdown--fence-line-p line)
     (cond
+      ((or (markdown-renderer-math-source renderer)
+           (and (not (markdown-renderer-code-open-p renderer))
+                (uiop:string-prefix-p "\\[" (display-math-trim line))))
+       (markdown--reset-table renderer)
+       (markdown--math-line renderer line))
       ((and (not (markdown-renderer-raw-fence-p renderer))
             (markdown-renderer-code-open-p renderer)
             fence-p
@@ -869,8 +910,12 @@ source as an ordinary fenced code block."
 
 (-> markdown-render-finish (markdown-renderer) list)
 (defun markdown-render-finish (renderer)
-  "Flush an open fence, returning raw fallback rows when it is incomplete.
-The operation resets only buffered Mermaid state and is idempotent."
+  "Flush buffered source from an incomplete display block or Mermaid fence."
+  (when (markdown-renderer-math-source renderer)
+    (with-slots (math-source math-size) renderer
+      (let ((source (when (listp math-source) (reverse math-source))))
+        (setf math-source nil math-size 0)
+        (return-from markdown-render-finish (markdown--math-source-rows renderer source)))))
   (if (and (markdown-renderer-code-open-p renderer)
            (markdown-renderer-mermaid-buffer-p renderer))
       (let ((rows (markdown--ordinary-fence-rows
@@ -889,6 +934,11 @@ The operation resets only buffered Mermaid state and is idempotent."
   "Return no committed rows, speculative live rows, and retained PARTIAL."
   (let ((preview-renderer     (markdown--copy-renderer renderer))
         (*markdown-preview-p* t))
+    (when (and (zerop (length partial)) (markdown-renderer-math-source renderer))
+      (return-from markdown-render-partial
+        (values nil (when (listp (markdown-renderer-math-source renderer))
+                      (markdown--math-source-rows renderer (reverse (markdown-renderer-math-source renderer))))
+                partial)))
     (if (and (markdown-renderer-code-open-p preview-renderer)
              (markdown-renderer-mermaid-buffer-p preview-renderer))
         (let* ((lines   (reverse (markdown-renderer-mermaid-source preview-renderer)))
@@ -896,4 +946,9 @@ The operation resets only buffered Mermaid state and is idempotent."
                (preview (markdown--ordinary-fence-rows preview-renderer all)))
           (values nil preview partial))
         (let ((preview-rows (markdown-render-line preview-renderer partial)))
-          (values nil (unless (equal preview-rows '(nil)) preview-rows) partial)))))
+          (values nil
+                  (cond ((and (null preview-rows) (listp (markdown-renderer-math-source preview-renderer)))
+                         (markdown--math-source-rows
+                          renderer (reverse (markdown-renderer-math-source preview-renderer))))
+                        ((not (equal preview-rows '(nil))) preview-rows))
+                  partial)))))
