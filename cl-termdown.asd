@@ -15,6 +15,8 @@
                               (:file "spans")
                               (:file "layout")
                               (:file "selector")
+                              (:file "math")
+                              (:file "display-math")
                               (:file "markdown"))))
   :in-order-to ((asdf:test-op (asdf:test-op #:cl-termdown/tests))))
 
@@ -27,6 +29,8 @@
                  :components ((:file "tests")
                               (:file "spans")
                               (:file "selector")
+                              (:file "math")
+                              (:file "display-math")
                               (:file "mermaid"))))
   :perform     (asdf:test-op (operation component)
                  (declare (ignore operation component))

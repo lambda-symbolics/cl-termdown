@@ -35,6 +35,16 @@ Call =markdown-render-line= when a newline commits that logical line.
   (values committed live retained))
 #+END_SRC
 
+* Inline math
+
+Use =\( ... \)= on one logical line for math expressions. For example,
+=\(\rho(x) \ne A*B\)= renders as =ρ(x) ≠ A*B=. Use common Greek letter
+commands and operators such as =\times=, =\leq=, =\infty=, and =\to=.
+Use =A_{ij}^2= for Aᵢⱼ². When a script lacks a Unicode glyph, read it as
+=^(...)= or =_(...)=. Use =\frac{a}{b}= for a parenthesized quotient and
+=\sqrt{x}= for √(x). These forms also work in display math and matrix cells.
+Code spans, unknown commands, and incomplete expressions show literal source.
+
 * Public API
 
 - =markdown-renderer=: stateful renderer class
@@ -128,3 +138,20 @@ flowchart TD
 
 Clermaid parses the groups and draws their frames and connections. Use the same
 Markdown rendering API for grouped and ungrouped diagrams.
+
+* Display math
+
+Start a line with =\[= and end the block with =\]=, on that line or a later one.
+Use supported inline math symbols or a rectangular =bmatrix= with an optional
+left-hand expression. Separate cells with =&= and rows with =\\=. For example:
+
+#+BEGIN_EXAMPLE
+\[A=\begin{bmatrix}a&b\\10&c\end{bmatrix}\]
+
+A=⎡a   b⎤
+  ⎣10  c⎦
+#+END_EXAMPLE
+
+Columns align by terminal cell width. Incomplete blocks preview as source; call
+=markdown-render-finish= to flush them. Unsupported, oversized (over 65,536
+buffered characters or rendered cells), or too-wide blocks appear as literal, wrapped source.
