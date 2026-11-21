@@ -20,6 +20,11 @@
    #:column-widths
    #:fit-text
    #:fit-spans
+   #:pad-spans
+   #:split-first-line
+   #:item-role
+   #:item-text
+   #:item-with-text
    #:render-spans
    #:selector-arrangement-error
    #:selector-arrangement-error-selector
@@ -28,6 +33,9 @@
    #:make-span
    #:make-widget
    #:markdown-render-inline
+   #:markdown-inline-spans
+   #:markdown-render-source
+   #:markdown-render-chunk
    #:markdown-render-line
    #:markdown-render-partial
    #:markdown-render-finish

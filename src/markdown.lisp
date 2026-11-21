@@ -8,6 +8,18 @@
     :reader        markdown-renderer-width
     :type          (integer 24)
     :documentation "The total cell budget for one rendered row including indents.")
+   (heading-role-function
+    :initarg       :heading-role-function
+    :initform      nil
+    :reader        markdown-renderer-heading-role-function
+    :type          (or null function)
+    :documentation "Optional role mapper for ATX headings, including previews.")
+   (fence-widget-function
+    :initarg       :fence-widget-function
+    :initform      nil
+    :reader        markdown-renderer-fence-widget-function
+    :type          (or null function)
+    :documentation "Optional pure factory accepting exact fenced source and copy label.")
    (raw-fence-p
     :initarg       :raw-fence-p
     :initform      nil
@@ -73,18 +85,30 @@
   (:documentation
    "A line-oriented renderer turning a restrained markdown subset into styled rows."))
 
-(-> markdown-renderer-create (&key (:width integer) (:raw-fence-p boolean)) markdown-renderer)
-(defun markdown-renderer-create (&key (width 80) raw-fence-p)
-  "Create a markdown renderer wrapping rendered rows within WIDTH cells."
+(-> markdown-renderer-create
+    (&key (:width integer) (:raw-fence-p boolean)
+          (:heading-role-function (option function)) (:fence-widget-function (option function)))
+    markdown-renderer)
+(defun markdown-renderer-create (&key (width 80) raw-fence-p heading-role-function fence-widget-function)
+  "Create a renderer within WIDTH cells, with optional heading and fence hooks.
+HEADING-ROLE-FUNCTION maps heading roles. FENCE-WIDGET-FUNCTION receives the
+exact original source and displayed label on fence close and returns an item.
+Both hooks also apply during speculative presentation and must be pure."
   (make-instance 'markdown-renderer :width (max 24 width)
-                 :raw-fence-p              raw-fence-p))
+                 :raw-fence-p              raw-fence-p
+                 :heading-role-function    heading-role-function
+                 :fence-widget-function    fence-widget-function))
 
 (-> markdown--copy-renderer (markdown-renderer) markdown-renderer)
 (defun markdown--copy-renderer (renderer)
   "Return an independent copy of RENDERER for speculative presentation."
   (let ((copy (make-instance 'markdown-renderer
                              :width       (markdown-renderer-width renderer)
-                             :raw-fence-p (markdown-renderer-raw-fence-p renderer))))
+                             :raw-fence-p (markdown-renderer-raw-fence-p renderer)
+                             :heading-role-function
+                             (markdown-renderer-heading-role-function renderer)
+                             :fence-widget-function
+                             (markdown-renderer-fence-widget-function renderer))))
     (setf (markdown-renderer-code-open-p copy)
           (markdown-renderer-code-open-p renderer)
           (markdown-renderer-code-line-number copy)
@@ -648,6 +672,12 @@ inline Markdown styling."
 
 
 ;;;; -- Public Rendering Operations --
+(-> markdown-inline-spans (string) list)
+(defun markdown-inline-spans (text)
+  "Return sanitized, unwrapped inline Markdown TEXT as semantic items."
+  (multiple-value-bind (rendered styles)
+      (markdown--parse-inline (sanitize-text text))
+    (markdown--style-runs rendered styles)))
 
 (-> markdown-render-inline (string integer) list)
 (defun markdown-render-inline (text width)
@@ -676,8 +706,10 @@ inline Markdown styling."
 (-> markdown--ordinary-fence-rows (markdown-renderer list) list)
 (defun markdown--ordinary-fence-rows (renderer lines)
   "Return LINES rendered as an ordinary fenced code block at RENDERER's width."
-  (let ((copy (markdown-renderer-create :width      (markdown-renderer-width renderer)
-                                       :raw-fence-p t))
+  (let ((copy (markdown-renderer-create
+               :width (markdown-renderer-width renderer) :raw-fence-p t
+               :heading-role-function (markdown-renderer-heading-role-function renderer)
+               :fence-widget-function (markdown-renderer-fence-widget-function renderer)))
         (rows nil))
     (dolist (line lines (nreverse rows))
       (setf rows (nconc (nreverse (markdown-render-line copy line)) rows)))))
@@ -733,6 +765,39 @@ inline Markdown styling."
               "rendering error"))
            condition)))
 
+(-> markdown--fence-close-row (markdown-renderer) list)
+(defun markdown--fence-close-row (renderer)
+  "Return a fence footer, creating an application widget when requested."
+  (let ((factory (markdown-renderer-fence-widget-function renderer)))
+    (list (make-span ':dim "  ``` ")
+          (if factory
+              (funcall factory (markdown-renderer-closed-code-source renderer) "⧉ copy")
+              (make-span ':code-copy "⧉ copy")))))
+
+(-> markdown--heading-p (string) boolean)
+(defun markdown--heading-p (line)
+  "Return true for an ATX heading of level one through six."
+  (let* ((start (or (position-if-not (lambda (character) (char= character #\Space)) line)
+                    (length line)))
+         (end   (or (position-if-not (lambda (character) (char= character #\#)) line :start start)
+                    (length line))))
+    (and (<= start 3) (<= 1 (- end start) 6)
+         (or (= end (length line))
+             (not (null (find (char line end) '(#\Space #\Tab))))))))
+
+(-> markdown--heading-rows (markdown-renderer string) list)
+(defun markdown--heading-rows (renderer line)
+  "Render heading markup and inline items, mapping ordinary roles."
+  (let ((mapper (markdown-renderer-heading-role-function renderer)))
+    (mapcar (lambda (row)
+              (mapcar (lambda (item)
+                        (if (or (null mapper) (widget-p item))
+                            item
+                            (item-with-text item (item-text item)
+                                            :role (funcall mapper (item-role item)))))
+                      row))
+            (markdown--wrapped-rows renderer line))))
+
 (-> markdown--close-mermaid (markdown-renderer) list)
 (defun markdown--close-mermaid (renderer)
   "Close RENDERER's Mermaid fence and return its diagram rows.
@@ -753,9 +818,7 @@ source as an ordinary fenced code block."
           (markdown-renderer-code-source renderer) nil)
     (markdown--clear-mermaid renderer)
     (if rows
-        (append rows
-                (list (list (make-span ':dim "  ``` ")
-                            (make-span ':code-copy "⧉ copy"))))
+        (append rows (list (markdown--fence-close-row renderer)))
         (append notice
                 (markdown--ordinary-fence-rows renderer (append source-lines (list "```")))))))
 
@@ -779,8 +842,7 @@ source as an ordinary fenced code block."
              (format nil "~{~A~^~%~}"
                      (reverse (markdown-renderer-code-source renderer)))
              (markdown-renderer-code-source renderer) nil)
-       (list (list (make-span ':dim "  ``` ")
-                   (make-span ':code-copy "⧉ copy"))))
+       (list (markdown--fence-close-row renderer)))
       ((and (not (markdown-renderer-raw-fence-p renderer))
             (markdown-renderer-code-open-p renderer)
             (markdown-renderer-mermaid-buffer-p renderer))
@@ -834,6 +896,9 @@ source as an ordinary fenced code block."
               (markdown--mermaid-notice
                renderer "source limit exceeded (65536 characters)."))
             (list (list (make-span ':dim (format nil "  ```~A" language)))))))
+      ((markdown--heading-p line)
+       (markdown--reset-table renderer)
+       (markdown--heading-rows renderer line))
       ((zerop (length (string-trim " " line)))
        (markdown--reset-table renderer)
        (list nil))
@@ -880,3 +945,39 @@ The operation resets only buffered Mermaid state and is idempotent."
           (values nil preview partial))
         (let ((preview-rows (markdown-render-line preview-renderer partial)))
           (values nil (unless (equal preview-rows '(nil)) preview-rows) partial)))))
+
+(-> markdown-render-chunk
+    (markdown-renderer string &key (:pending string) (:finished-p boolean) (:trailing-empty-p boolean))
+    (values list list string))
+(defun markdown-render-chunk (renderer chunk &key (pending "") finished-p trailing-empty-p)
+  "Consume CHUNK after PENDING, returning committed rows, live rows and retained text.
+Complete logical lines commit once. Finish the retained line and flush buffered
+fences when FINISHED-P. TRAILING-EMPTY-P renders an empty final logical line."
+  (let ((text  (if (zerop (length pending)) chunk (concatenate 'string pending chunk)))
+        (start 0)
+        (rows  nil))
+    (flet ((collect-rows (next)
+             (dolist (row next) (push row rows))))
+      (loop for newline = (position #\Newline text :start start)
+            while newline
+            do (collect-rows (markdown-render-line renderer (subseq text start newline)))
+               (setf start (1+ newline)))
+      (let ((retained (subseq text start)))
+        (if finished-p
+            (progn
+              (when (or (plusp (length retained)) trailing-empty-p)
+                (collect-rows (markdown-render-line renderer retained)))
+              (collect-rows (markdown-render-finish renderer))
+              (values (nreverse rows) nil ""))
+            (multiple-value-bind (committed live remainder)
+                (markdown-render-partial renderer retained)
+              (collect-rows committed)
+              (values (nreverse rows) live remainder)))))))
+
+(-> markdown-render-source (markdown-renderer string &key (:trailing-empty-p boolean)) list)
+(defun markdown-render-source (renderer source &key trailing-empty-p)
+  "Render complete SOURCE and flush buffered fences, returning semantic rows.
+Set TRAILING-EMPTY-P to include an empty final logical line, including for
+empty SOURCE. Retain original fenced source exactly for widget factories."
+  (nth-value 0 (markdown-render-chunk renderer source :finished-p    t
+                                                   :trailing-empty-p trailing-empty-p)))

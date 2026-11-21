@@ -50,6 +50,23 @@ character offset, such as a mouse click, back to the ACTION."
   (label  ""     :type string  :read-only t)
   (action nil    :read-only t))
 
+(-> item-role ((or span widget)) keyword)
+(defun item-role (item)
+  "Return the semantic role of a span or widget ITEM."
+  (if (widget-p item) (widget-role item) (span-role item)))
+
+(-> item-text ((or span widget)) string)
+(defun item-text (item)
+  "Return the untrusted text or label of ITEM."
+  (if (widget-p item) (widget-label item) (span-text item)))
+
+(-> item-with-text ((or span widget) string &key (:role keyword)) (or span widget))
+(defun item-with-text (item text &key (role (item-role item)))
+  "Return ITEM with TEXT and ROLE, retaining a widget's original action."
+  (if (widget-p item)
+      (make-widget role text (widget-action item))
+      (make-span role text)))
+
 (-> presentation-spans (list) list)
 (defun presentation-spans (items)
   "Return ITEMS with every widget replaced by the span showing its label."
@@ -61,23 +78,50 @@ character offset, such as a mouse click, back to the ACTION."
               items)
       items))
 
-(-> widget-regions (list &key (:start integer)) list)
-(defun widget-regions (items &key (start 0))
+(-> termdown--cell-offsets (string) (values vector vector))
+(defun termdown--cell-offsets (text)
+  "Return start and end cell offsets for every character boundary in TEXT.
+Boundaries inside a grapheme cover that complete grapheme. Newlines occupy no cells."
+  (let ((starts (make-array (1+ (length text)) :initial-element 0))
+        (ends   (make-array (1+ (length text)) :initial-element 0))
+        (cells  0))
+    (loop for start = 0 then end
+          while (< start (length text))
+          for end = (clinedi:grapheme-next-boundary text start)
+          for width = (if (char= (char text start) #\Newline)
+                          0
+                          (clinedi:grapheme-cell-width text start end))
+          do (loop for index from start below end
+                   do (setf (aref starts index) cells
+                            (aref ends (1+ index)) (+ cells width)))
+             (incf cells width)
+             (setf (aref starts end) cells))
+    (values starts ends)))
+
+(-> widget-regions (list &key (:start integer) (:unit (member :character :cell))) list)
+(defun widget-regions (items &key (start 0) (unit ':character))
   "Return the (START END ACTION) region of each widget among ITEMS.
 
-Offsets count characters of the text SPANS-TEXT presents for ITEMS, plus
-START, so regions of separately presented rows can be joined after their
-text is. Widgets with empty labels have no region."
-  (let ((position start)
-        (regions  nil))
-    (dolist (item items (nreverse regions))
-      (let ((length (length (sanitize-text (if (widget-p item)
-                                               (widget-label item)
-                                               (span-text item))))))
-        (when (and (widget-p item) (plusp length))
-          (push (list position (+ position length) (widget-action item))
-                regions))
-        (incf position length)))))
+UNIT defaults to :CHARACTER for offsets into SPANS-TEXT. Use :CELL for
+terminal hit testing. Cell regions cover whole graphemes even when their
+characters cross item boundaries. START shifts either unit; empty labels
+and labels without visible cells have no cell region."
+  (let* ((texts    (mapcar (lambda (item) (sanitize-text (item-text item))) items))
+         (text     (apply #'concatenate 'string texts))
+         (position 0)
+         (regions  nil))
+    (multiple-value-bind (starts ends)
+        (when (eq unit ':cell) (termdown--cell-offsets text))
+      (loop for item in items
+            for label in texts
+            for end = (+ position (length label))
+            do (when (and (widget-p item) (< position end))
+                 (let ((a (if starts (aref starts position) position))
+                       (b (if ends (aref ends end) end)))
+                   (when (< a b)
+                     (push (list (+ start a) (+ start b) (widget-action item)) regions))))
+               (setf position end)))
+    (nreverse regions)))
 
 (-> shift-regions (list integer) list)
 (defun shift-regions (regions offset)
@@ -101,9 +145,8 @@ text is. Widgets with empty labels have no region."
 
 (-> spans-width (list) (integer 0))
 (defun spans-width (spans)
-  "Return the total terminal cell width of SPANS and widgets."
-  (loop for span in (presentation-spans spans)
-        sum (text-cell-width (span-text span))))
+  "Return the single-row cell width of joined, sanitized SPANS and widgets."
+  (text-cell-width (spans-text spans :single-line-p t)))
 
 (-> termdown--spans-subseq (list integer integer) list)
 (defun termdown--spans-subseq (spans start end)
@@ -111,13 +154,13 @@ text is. Widgets with empty labels have no region."
   (let ((position 0)
         (result   nil))
     (dolist (span spans (nreverse result))
-      (let* ((text       (span-text span))
+      (let* ((text       (item-text span))
              (span-end   (+ position (length text)))
              (part-start (max start position))
              (part-end   (min end span-end)))
         (when (< part-start part-end)
-          (push (make-span
-                 (span-role span)
+          (push (item-with-text
+                 span
                  (subseq text
                          (- part-start position)
                          (- part-end position)))
@@ -137,16 +180,43 @@ text is. Widgets with empty labels have no region."
 (defun fit-spans (spans maximum-width)
   "Return sanitized single-line SPANS clipped to MAXIMUM-WIDTH cells.
 
-Retain semantic roles and complete graphemes, including graphemes whose
-characters occur in adjacent spans. Widgets become the spans of their labels."
+Retain semantic roles, widget actions and complete graphemes, including
+graphemes whose characters occur in adjacent items. Use PRESENTATION-SPANS
+when an explicit display-only projection is needed."
   (let* ((safe    (mapcar (lambda (span)
-                            (make-span (span-role span)
-                                       (sanitize-text (span-text span)
-                                                      :single-line-p t)))
-                          (presentation-spans spans)))
-         (text    (apply #'concatenate 'string (mapcar #'span-text safe)))
+                            (item-with-text span
+                                            (sanitize-text (item-text span)
+                                                           :single-line-p t)))
+                          spans))
+         (text    (apply #'concatenate 'string (mapcar #'item-text safe)))
          (visible (clinedi:text-cell-prefix text (max 0 maximum-width))))
     (termdown--spans-subseq safe 0 (length visible))))
+
+(-> pad-spans (list integer &key (:role keyword)) list)
+(defun pad-spans (spans width &key (role ':plain))
+  "Clip or pad SPANS to WIDTH cells, using ROLE for padding and retaining actions."
+  (let* ((width     (max 0 width))
+         (clipped   (fit-spans spans width))
+         (remaining (- width (spans-width clipped))))
+    (if (plusp remaining)
+        (append clipped (list (make-span role (make-string remaining :initial-element #\Space))))
+        clipped)))
+
+(-> split-first-line (list) (values list list))
+(defun split-first-line (spans)
+  "Return SPANS before their first newline and the rest from that newline on.
+A split widget retains its original action in both pieces."
+  (loop for (item . more) on spans
+        for text = (item-text item)
+        for newline = (position #\Newline text)
+        if newline
+          return (values
+                  (append head (when (plusp newline)
+                                 (list (item-with-text item (subseq text 0 newline)))))
+                  (cons (item-with-text item (subseq text newline)) more))
+        else
+          collect item into head
+        finally (return (values head nil))))
 
 (-> render-spans (list &key (:style-function (option function))) string)
 (defun render-spans (spans &key style-function)

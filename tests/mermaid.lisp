@@ -135,7 +135,7 @@
       (multiple-value-bind (b pb rb) (markdown-render-partial renderer "x")
         (declare (ignore b rb))
         (test-assert (equal pa pb) "repeated partial is stable")))
-    (let ((rows (termdown:markdown-render-finish renderer)))
+    (let ((rows (termdown:markdown-render-chunk renderer "" :finished-p t)))
       (test-assert (search "flowchart LR" (mermaid-test-text rows)) "finish flushes source")
       (test-assert (null (mermaid-test-notices rows)) "unfinished source has no failure diagnostic")
       (test-assert (null (termdown:markdown-render-finish renderer)) "finish is idempotent")))
