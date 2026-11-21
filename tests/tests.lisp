@@ -437,6 +437,7 @@
   (test-span-presentation)
   (test-widget-regions)
   (test-markdown-inline-spans)
+  (test-markdown-inline-math)
   (test-markdown-links)
   (test-markdown-lists)
   (test-markdown-code-blocks)
