@@ -238,6 +238,22 @@ retained in style descriptors for the row's widget conversion."
                  (and (<= end (length text))
                       (string= text marker :start1 index :end1 end))))
 
+             (emit-math ()
+               (let* ((start (+ index 2))
+                      (close (loop for pos = (search "\\)" text :start2 start)
+                                   then (search "\\)" text :start2 (+ pos 2))
+                                   while pos
+                                   unless (markdown--escaped-p text pos) return pos))
+                      (end (if close (+ close 2) (length text)))
+                      (translated (and close (math-symbol-text (subseq text start close)))))
+                 (if translated
+                     (progn
+                       (loop for ch across translated
+                             do (vector-push-extend ch rendered)
+                                (vector-push-extend mode styles))
+                       (setf index end))
+                     (loop while (< index end) do (emit)))))
+
              (emit-link ()
                (multiple-value-bind (end label url) (markdown--link-at text index)
                  (when end
@@ -259,6 +275,8 @@ retained in style descriptors for the row's widget conversion."
                  ((and (char= (char text index) #\`)
                        (position #\` text :start (1+ index)))
                   (setf code-return-mode mode mode ':code) (incf index))
+                 ((and (marker-p "\\(") (not (markdown--escaped-p text index)))
+                  (emit-math))
                  ((emit-link)
                   nil)
                  ((eq mode ':strong)
@@ -275,8 +293,7 @@ retained in style descriptors for the row's widget conversion."
                            (markdown--escapable-p (char text (1+ index))))
                       (progn
                         (incf index)
-                        (emit)
-                        (incf index))
+                        (emit))
                       (cond
                         ((and (marker-p "**")
                               (markdown--inline-openable-p text index "**"))

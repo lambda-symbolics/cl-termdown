@@ -35,6 +35,15 @@ Call =markdown-render-line= when a newline commits that logical line.
   (values committed live retained))
 #+END_SRC
 
+* Inline math
+
+Use =\( ... \)= on one logical line for flat expressions. For example,
+=\(\rho(x) \ne A*B\)= renders as =ρ(x) ≠ A*B=. Use common Greek letter
+commands and operators such as =\times=, =\leq=, =\infty=, and =\to=.
+Code spans show literal source. For unknown commands, structured notation
+(such as subscripts or fractions), or a missing closing delimiter, the
+renderer shows the expression as typed.
+
 * Public API
 
 - =markdown-renderer=: stateful renderer class
