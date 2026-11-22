@@ -37,10 +37,15 @@ Call =markdown-render-line= when a newline commits that logical line.
 
 * Public API
 
-- =markdown-renderer-create=: create a stateful renderer with =:width=,
-  optional =:heading-role-function= mapping heading roles, and optional
-  =:fence-widget-function= receiving exact original source and the copy label
-  and returning an application item; hooks also apply to previews and must be pure
+- =markdown-renderer-create=: create a stateful renderer with =:width= and
+  optional pure hooks, including in previews:
+  - =:heading-role-function= maps heading roles.
+  - =:inline-decorator= receives unwrapped semantic items for a prose line,
+    heading or table cell and returns items with the same concatenated text.
+    It runs after block role mapping and before wrapping. Preserve literal
+    styles and existing widget actions when restyling prose.
+  - =:fence-widget-function= receives the original source and copy label
+    and returns an application item.
 - =markdown-renderer-width=: read its effective row width
 - =markdown-renderer-closed-code-source=: original body of the most recently
   closed fence, cleared when another fence opens

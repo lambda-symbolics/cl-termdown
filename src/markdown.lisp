@@ -14,6 +14,12 @@
     :reader        markdown-renderer-heading-role-function
     :type          (or null function)
     :documentation "Optional role mapper for ATX headings, including previews.")
+   (inline-decorator
+    :initarg       :inline-decorator
+    :initform      nil
+    :reader        markdown-renderer-inline-decorator
+    :type          (or null function)
+    :documentation "Optional pure function restyling unwrapped inline semantic items.")
    (fence-widget-function
     :initarg       :fence-widget-function
     :initform      nil
@@ -86,18 +92,24 @@
    "A line-oriented renderer turning a restrained markdown subset into styled rows."))
 
 (-> markdown-renderer-create
-    (&key (:width integer) (:raw-fence-p boolean)
+    (&key (:width integer) (:raw-fence-p boolean) (:inline-decorator (option function))
           (:heading-role-function (option function)) (:fence-widget-function (option function)))
     markdown-renderer)
-(defun markdown-renderer-create (&key (width 80) raw-fence-p heading-role-function fence-widget-function)
-  "Create a renderer within WIDTH cells, with optional heading and fence hooks.
-HEADING-ROLE-FUNCTION maps heading roles. FENCE-WIDGET-FUNCTION receives the
-exact original source and displayed label on fence close and returns an item.
-Both hooks also apply during speculative presentation and must be pure."
+(defun markdown-renderer-create (&key (width 80) raw-fence-p inline-decorator
+                                      heading-role-function fence-widget-function)
+  "Create a renderer within WIDTH cells with optional presentation hooks.
+HEADING-ROLE-FUNCTION maps heading roles. INLINE-DECORATOR takes a list of
+unwrapped inline spans and widgets after block role mapping and returns items
+with exactly the same concatenated text. This includes headings and table cells,
+but excludes fenced blocks, indentation and table borders. Leave literal spans
+and existing widget actions intact when restyling prose.
+FENCE-WIDGET-FUNCTION takes the exact original source and displayed label on
+fence close and returns an item. Hooks must be pure, including in previews."
   (make-instance 'markdown-renderer :width (max 24 width)
-                 :raw-fence-p              raw-fence-p
-                 :heading-role-function    heading-role-function
-                 :fence-widget-function    fence-widget-function))
+                 :raw-fence-p           raw-fence-p
+                 :inline-decorator      inline-decorator
+                 :heading-role-function heading-role-function
+                 :fence-widget-function fence-widget-function))
 
 (-> markdown--copy-renderer (markdown-renderer) markdown-renderer)
 (defun markdown--copy-renderer (renderer)
@@ -105,6 +117,8 @@ Both hooks also apply during speculative presentation and must be pure."
   (let ((copy (make-instance 'markdown-renderer
                              :width       (markdown-renderer-width renderer)
                              :raw-fence-p (markdown-renderer-raw-fence-p renderer)
+                             :inline-decorator
+                             (markdown-renderer-inline-decorator renderer)
                              :heading-role-function
                              (markdown-renderer-heading-role-function renderer)
                              :fence-widget-function
@@ -315,10 +329,14 @@ retained in style descriptors for the row's widget conversion."
 
 (-> markdown--style-span (t string) t)
 (defun markdown--style-span (style text)
-  "Turn a parser style and visible text into a span or link widget."
-  (if (and (consp style) (eq (first style) ':link))
-      (make-widget ':link text (list ':open-url (rest style)))
-      (make-span style text)))
+  "Turn STYLE and visible TEXT into a span or widget."
+  (cond
+    ((widget-p style)
+     (item-with-text style text))
+    ((consp style)
+     (make-widget ':link text (list ':open-url (rest style))))
+    (t
+     (make-span style text))))
 
 (-> markdown--style-runs
     (string vector &key (:start integer) (:end integer))
@@ -340,6 +358,28 @@ retained in style descriptors for the row's widget conversion."
                        (subseq rendered run-start end))
             spans))
     (nreverse spans)))
+
+(-> markdown--inline-layout (markdown-renderer string &optional (option function)) (values string vector))
+(defun markdown--inline-layout (renderer text &optional style-function)
+  "Return inline text and character styles after role mapping and decoration."
+  (multiple-value-bind (rendered styles)
+      (markdown--parse-inline text)
+    (when style-function
+      (map-into styles style-function styles))
+    (let ((decorate (markdown-renderer-inline-decorator renderer)))
+      (when decorate
+        (let ((offset 0))
+          (dolist (item (funcall decorate (markdown--style-runs rendered styles)))
+            (let* ((text (item-text item))
+                   (end  (+ offset (length text))))
+              (unless (and (<= end (length rendered))
+                           (string= text rendered :start2 offset :end2 end))
+                (error "Markdown inline decoration changed the rendered text."))
+              (fill styles (if (widget-p item) item (item-role item)) :start offset :end end)
+              (setf offset end)))
+          (unless (= offset (length rendered))
+            (error "Markdown inline decoration removed rendered text.")))))
+    (values rendered styles)))
 
 
 ;;;; -- Line Classification --
@@ -485,29 +525,26 @@ that compact form even though stricter Markdown dialects require three."
              (make-list (length cells) :initial-element 3)
              :fill-p    t))))
 
-(-> markdown--table-cell-rows (string integer boolean) list)
-(defun markdown--table-cell-rows (cell width header-p)
-  "Return CELL wrapped to WIDTH as rows of inline spans.
-
-HEADER-P makes all visible header text strong. Body cells retain ordinary
-inline Markdown styling."
+(-> markdown--table-cell-rows (markdown-renderer string integer &key (:header-p boolean)) list)
+(defun markdown--table-cell-rows (renderer cell width &key header-p)
+  "Return CELL wrapped to WIDTH as rows of inline items."
   (multiple-value-bind (rendered styles)
-      (markdown--parse-inline cell)
+      (markdown--inline-layout
+       renderer cell
+       (when header-p
+         (let ((decorated-p (not (null (markdown-renderer-inline-decorator renderer)))))
+           (lambda (style)
+             (if (and decorated-p (or (eq style ':code) (consp style)))
+                 style
+                 ':strong)))))
     (let ((rows   nil)
           (cursor 0))
       (dolist (row-text (wrap-text rendered width))
-        (let ((start (if (zerop (length row-text))
-                         cursor
-                         (search row-text rendered :start2 cursor))))
-          (push (if header-p
-                    (and (plusp (length row-text))
-                         (list (make-span ':strong row-text)))
-                    (markdown--style-runs rendered
-                                          styles
-                                          :start start
-                                          :end   (+ start (length row-text))))
-                rows)
-          (setf cursor (+ start (length row-text)))))
+        (let* ((start (if (zerop (length row-text)) cursor
+                          (search row-text rendered :start2 cursor)))
+               (end   (+ start (length row-text))))
+          (push (markdown--style-runs rendered styles :start start :end end) rows)
+          (setf cursor end)))
       (or (nreverse rows) (list nil)))))
 
 (-> markdown--table-rows (markdown-renderer list boolean) list)
@@ -516,7 +553,7 @@ inline Markdown styling."
   (let* ((widths  (markdown--table-column-widths renderer cells))
          (columns (loop for cell in cells
                         for width in widths
-                        collect (markdown--table-cell-rows cell width header-p)))
+                         collect (markdown--table-cell-rows renderer cell width :header-p header-p)))
          (height  (loop for column in columns maximize (length column))))
     (loop for row-index below height
           collect
@@ -603,13 +640,12 @@ inline Markdown styling."
 
 (-> markdown--wrapped-rows
     (markdown-renderer string
-     &key (:first-prefix list) (:continuation-prefix list))
+     &key (:first-prefix list) (:continuation-prefix list) (:style-function (option function)))
     list)
-(defun markdown--wrapped-rows
-    (renderer content &key first-prefix continuation-prefix)
+(defun markdown--wrapped-rows (renderer content &key first-prefix continuation-prefix style-function)
   "Return CONTENT as wrapped, prefixed, styled transcript rows."
   (multiple-value-bind (rendered styles)
-      (markdown--parse-inline content)
+      (markdown--inline-layout renderer content style-function)
     (let* ((prefix-width  (max (spans-width first-prefix)
                                (spans-width continuation-prefix)))
            (content-width (max 8 (- (markdown-renderer-width renderer)
@@ -789,14 +825,21 @@ inline Markdown styling."
 (defun markdown--heading-rows (renderer line)
   "Render heading markup and inline items, mapping ordinary roles."
   (let ((mapper (markdown-renderer-heading-role-function renderer)))
-    (mapcar (lambda (row)
-              (mapcar (lambda (item)
-                        (if (or (null mapper) (widget-p item))
-                            item
-                            (item-with-text item (item-text item)
-                                            :role (funcall mapper (item-role item)))))
-                      row))
-            (markdown--wrapped-rows renderer line))))
+    (cond
+      ((null mapper)
+       (markdown--wrapped-rows renderer line))
+      ((markdown-renderer-inline-decorator renderer)
+       (markdown--wrapped-rows renderer line
+                               :style-function (lambda (style)
+                                                 (if (keywordp style)
+                                                     (funcall mapper style)
+                                                     style))))
+      (t
+       (loop for row in (markdown--wrapped-rows renderer line)
+             collect (loop for item in row
+                           collect (if (widget-p item) item
+                                       (item-with-text item (item-text item)
+                                                       :role (funcall mapper (item-role item))))))))))
 
 (-> markdown--close-mermaid (markdown-renderer) list)
 (defun markdown--close-mermaid (renderer)
